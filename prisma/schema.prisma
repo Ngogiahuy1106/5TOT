@@ -1,0 +1,50 @@
+// prisma/schema.prisma - sv5tot-hoso
+// ---------------------------------------------------------------------------
+// Submission: 1 dòng = 1 hồ sơ sinh viên đã bấm "Gửi cho Ban SV5T". `data` lưu
+// nguyên trạng thái form (JSON) để có thể tái tạo lại đúng bản đã gửi bất cứ
+// lúc nào (kể cả khi sau này đổi cấu trúc tiêu chí); `evidenceImages` chỉ lưu
+// metadata ảnh trong Supabase Storage (path, tên file, contentType). Ảnh thật không
+// còn được nhúng base64 vào PostgreSQL.
+//
+// AppConfig: 4 link mẫu đơn hiện ở bước "Minh chứng hoạt động", sửa được qua
+// mục Quản trị trên web (không cần đổi code/deploy lại). Mật khẩu quản trị
+// KHÔNG lưu ở đây - nằm trong biến môi trường ADMIN_PASSWORD, chỉ server biết.
+// ---------------------------------------------------------------------------
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Submission {
+  id             String   @id @default(cuid())
+  fullName       String
+  mssv           String
+  className      String
+  data           Json
+  evidenceImages Json
+  status         String   @default("Chưa kiểm tra")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([mssv])
+}
+
+model AppConfig {
+  key                  String   @id // luôn chỉ 1 dòng, key = "main"
+  linkDeXuatHoatDong   String?
+  linkXacNhanClb       String?
+  linkXacNhanNgoaiKhoa String?
+  linkXacNhanChung     String?
+  submissionsOpen      Boolean  @default(true)
+  submissionStartAt    DateTime?
+  submissionEndAt      DateTime?
+  submissionClosedMessage String @default("Hiện không trong thời gian nhận hồ sơ.")
+  updatedAt            DateTime @updatedAt
+}

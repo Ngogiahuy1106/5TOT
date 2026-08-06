@@ -1,0 +1,22 @@
+{
+  "name": "sv5tot-hoso",
+  "version": "1.0.0",
+  "description": "Ho so Sinh vien 5 tot - Express + Prisma + PostgreSQL (Supabase).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0"
+  }
+}
