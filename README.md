@@ -136,6 +136,7 @@ văn bản của hồ sơ.
 - Session và rate-limit được lưu trong PostgreSQL nên không mất khi Render restart hoặc chạy nhiều instance.
 - Ảnh bị kiểm tra MIME, chữ ký tệp và kích thước ngay trước bước review; dữ liệu ảnh sai trả 400 thay vì lỗi máy chủ. Lỗi dọn Storage được đưa vào hàng đợi retry có claim/lease an toàn cho nhiều instance.
 - Thư viện xuất Word `docx` 8.5.0 được lưu tại `public/vendor` nên không phụ thuộc jsDelivr; giấy phép MIT đi kèm trong cùng thư mục.
+- Hai bộ chữ của giao diện (Be Vietnam Pro cho chữ thân, Petrona cho tiêu đề) nằm ở `public/fonts`, khai báo trong `fonts.css` và nạp ngay trước `css/style.css`. Tự lưu như vậy nên trang giữ đúng dáng chữ cả khi mạng trường chặn Google Fonts, và CSP ở `server.js` không phải mở thêm host nào. Giấy phép SIL OFL 1.1, ghi chú trong `public/fonts/README.md`.
 
 Sau khi cập nhật code, chạy migration mới:
 

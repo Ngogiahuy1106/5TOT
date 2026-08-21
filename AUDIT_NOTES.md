@@ -149,3 +149,23 @@ Lưu ý còn lại: SheetJS vẫn tải từ CDN nhưng đã ghim phiên bản v
 - `applyActivityCatalog` dùng chung công thức sinh ID với `parseActivityCatalogRows`.
 
 Kiểm thử: `npm test` — 40/40 pass (thêm `test/volunteer-dates.test.js`).
+
+## Cập nhật 2026-08-21 (b) — làm lại giao diện bước Tình nguyện
+
+- Hai đường thêm hoạt động hiện SONG SONG, không giấu sau nút bật/tắt:
+  dropdown danh mục của Ban và ô tự nhập tên hoạt động. Bản báo cáo mẫu cho thấy
+  phần lớn hoạt động tình nguyện là việc hỗ trợ phát sinh không có trong danh mục,
+  nên tự nhập phải là đường chính chứ không phải "đề xuất" phụ.
+- Tự nhập trùng tên một hoạt động trong danh mục sẽ tự gắn vào mục chính thức,
+  tránh cùng một hoạt động tồn tại hai bản khác nhau.
+- Chặn thêm trùng theo cả ID lẫn tên đã chuẩn hóa.
+- Mỗi hoạt động là một thẻ riêng: số thứ tự, nhãn "Từ danh mục của Ban" / "Tự nhập",
+  ô số ngày quy đổi (kèm gợi ý số ngày ghi trong danh mục), danh sách ngày dạng chip,
+  và dòng xem trước đúng nội dung sẽ in ra báo cáo.
+- Viền trái thẻ xanh khi đã đủ ngày, đỏ khi còn thiếu danh sách ngày.
+- Thanh tiến độ "x / 5 ngày" thay cho dòng chữ; ô "bổ sung sau" chỉ hiện khi thực sự
+  còn thiếu và tự bỏ tick khi đã đủ.
+- Ô số ngày để trống khi mới thêm (thay vì mặc định 0) để sinh viên buộc phải điền.
+- Có breakpoint 760px: panel thêm và thân thẻ xếp một cột trên điện thoại.
+- Chế độ quản trị xem hồ sơ ẩn toàn bộ panel thêm, nút Xóa, nút thêm ngày và dấu ×
+  trên chip, nhưng vẫn hiện đầy đủ nội dung và dòng xem trước.

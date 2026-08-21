@@ -3,32 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
 <title>Hồ sơ Sinh viên 5 tốt</title>
+<link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <header class="app-header">
   <div class="app-header-inner">
-    <div>
-      <h1>Hồ sơ Sinh viên 5 tốt - Hồ sơ bản mềm</h1>
-      <p>Tạo và kiểm tra hồ sơ bản mềm online</p>
+    <div class="app-brand">
+      <p class="app-eyebrow">Trường Điện - Điện tử · Đại học Bách khoa Hà Nội</p>
+      <h1>Hồ sơ Sinh viên 5 tốt</h1>
+      <p class="app-tagline">Khai bản mềm, tự soát lại, rồi gửi cho Ban SV5T.</p>
     </div>
     <div class="no-print header-actions">
-      <button id="fillSampleBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Điền dữ liệu mẫu (Nguyễn Văn A)</button>
-      <button id="importExcelBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Nhập Excel hoạt động</button>
-      <button id="exportExcelBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Xuất Excel hoạt động</button>
-      <button id="adminConfigBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Cấu hình</button>
-      <button id="lookupSubmissionBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff">Tra cứu hồ sơ</button>
-      <button id="adminSubmissionsBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Hồ sơ đã gửi</button>
+      <button id="fillSampleBtn" class="btn btn-secondary" style="display:none">Điền thử dữ liệu mẫu</button>
+      <button id="importExcelBtn" class="btn btn-secondary" style="display:none">Nhập Excel hoạt động</button>
+      <button id="exportExcelBtn" class="btn btn-secondary" style="display:none">Xuất Excel hoạt động</button>
+      <button id="adminConfigBtn" class="btn btn-secondary" style="display:none">Cấu hình</button>
+      <button id="lookupSubmissionBtn" class="btn btn-secondary">Tra cứu hồ sơ</button>
+      <button id="adminSubmissionsBtn" class="btn btn-secondary" style="display:none">Hồ sơ đã gửi</button>
       <input type="file" id="importExcelInput" accept=".xlsx,.xls" style="display:none">
-      <button id="adminLoginBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff">Quản trị</button>
+      <button id="adminLoginBtn" class="btn btn-secondary">Quản trị</button>
     </div>
   </div>
 </header>
 
+<!-- Thanh bước: neo lại khi cuộn để sinh viên luôn biết mình đang ở đâu. -->
+<div class="step-rail no-print">
+  <div class="step-rail-inner">
+    <div class="steps" id="steps"></div>
+  </div>
+</div>
+
 <div class="wrap">
-  <div class="steps" id="steps"></div>
   <div id="stepContent"></div>
 </div>
 
@@ -37,7 +46,7 @@
 
   <div id="passwordModal" class="modal-box" style="display:none">
     <h3>Đăng nhập quản trị</h3>
-    <p class="modal-sub">Nhập mật khẩu Admin (dành riêng cho Ban PTSV5T SEEE)</p>
+    <p class="modal-sub">Dành riêng cho thành viên Ban PTSV5T SEEE.</p>
     <input type="password" id="adminPasswordInput" class="modal-input" placeholder="Mật khẩu">
     <p id="passwordModalError" class="err-msg" style="display:none"></p>
     <div class="modal-actions">
@@ -66,7 +75,7 @@
     </div>
     <hr class="modal-divider">
     <h3>Thời gian nhận hồ sơ</h3>
-    <div class="field"><label><input type="checkbox" id="cfgSubmissionsOpen"> Cho phép nhận hồ sơ</label></div>
+    <div class="field"><label class="check-label"><input type="checkbox" id="cfgSubmissionsOpen"> Cho phép nhận hồ sơ</label></div>
     <div class="row2"><div class="field"><label>Bắt đầu nhận</label><input type="datetime-local" id="cfgSubmissionStart"></div><div class="field"><label>Hạn cuối</label><input type="datetime-local" id="cfgSubmissionEnd"></div></div>
     <div class="field"><label>Năm báo cáo</label><input type="number" id="cfgReportYear" min="2020" max="2100" step="1"></div>
     <div class="field"><label>Thông báo khi đóng</label><input type="text" id="cfgSubmissionClosedMessage" maxlength="300"></div>
@@ -85,15 +94,15 @@
     <div class="modal-heading-row">
       <div>
         <h3>Hồ sơ sinh viên đã gửi</h3>
-        <p class="modal-sub">Dữ liệu được tải trực tiếp từ cơ sở dữ liệu.</p>
+        <p class="modal-sub">Dữ liệu đọc thẳng từ cơ sở dữ liệu.</p>
       </div>
       <button id="closeAdminSubmissionsBtn" class="modal-close-btn" type="button" aria-label="Đóng">Đóng</button>
     </div>
     <div id="adminDashboard" class="admin-dashboard">
       <div class="dashboard-card"><span>Tổng hồ sơ</span><strong id="dashTotal">0</strong></div>
-      <div class="dashboard-card"><span>Chưa kiểm tra</span><strong id="dashUnchecked">0</strong></div>
-      <div class="dashboard-card"><span>Cần bổ sung</span><strong id="dashNeedMore">0</strong></div>
-      <div class="dashboard-card"><span>Đã duyệt</span><strong id="dashApproved">0</strong></div>
+      <div class="dashboard-card is-waiting"><span>Chưa kiểm tra</span><strong id="dashUnchecked">0</strong></div>
+      <div class="dashboard-card is-pending"><span>Cần bổ sung</span><strong id="dashNeedMore">0</strong></div>
+      <div class="dashboard-card is-done"><span>Đã duyệt</span><strong id="dashApproved">0</strong></div>
     </div>
     <div class="admin-toolbar">
       <input type="text" id="submissionSearchInput" class="modal-input" placeholder="Tìm theo họ tên, MSSV hoặc lớp">
@@ -148,8 +157,8 @@
   <div id="submissionReviewModal" class="modal-box modal-box-review" style="display:none">
     <div class="modal-heading-row">
       <div>
-        <h3>Kiểm tra hồ sơ trước khi gửi</h3>
-        <p class="modal-sub">Hệ thống chỉ yêu cầu khai báo đầy đủ. Các mục chưa đạt hoặc chưa có minh chứng có thể chọn bổ sung sau.</p>
+        <h3>Soát hồ sơ trước khi gửi</h3>
+        <p class="modal-sub">Hệ thống chỉ yêu cầu khai đủ. Mục chưa đạt hoặc chưa có minh chứng vẫn để bổ sung sau được.</p>
       </div>
     </div>
     <div class="review-table-wrap">
@@ -166,19 +175,19 @@
   </div>
 
   <div id="adminCheckModal" class="modal-box modal-box-review" style="display:none">
-    <div class="modal-heading-row"><div><h3>Bản kiểm tra của Ban SV5T</h3><p class="modal-sub">Chỉ lưu đánh dấu và ghi chú của Ban; không thay đổi bất kỳ dữ liệu nào sinh viên đã gửi.</p></div></div>
-    <div class="admin-check-help">Tick nội dung có lỗi hoặc minh chứng chưa đúng/cần bổ sung. Các mục sinh viên chọn “Không đạt” không xuất hiện để tránh tick nhầm.</div>
+    <div class="modal-heading-row"><div><h3>Bản kiểm tra của Ban SV5T</h3><p class="modal-sub">Chỉ lưu đánh dấu và ghi chú của Ban; không đụng vào dữ liệu sinh viên đã gửi.</p></div></div>
+    <div class="admin-check-help">Tick nội dung có lỗi hoặc minh chứng chưa đúng/cần bổ sung. Các mục sinh viên chọn “Không đạt” không hiện ra, để tránh tick nhầm.</div>
     <div id="adminCheckTargets" class="admin-check-targets"></div>
     <div class="field"><label>Trạng thái xử lý</label><select id="adminCheckStatus"><option>Chưa kiểm tra</option><option>Cần bổ sung</option><option>Đã duyệt</option></select></div>
     <div class="field"><label>Người kiểm tra</label><select id="adminCheckReviewer"><option value="">Chọn người kiểm tra</option></select><span id="adminCheckReviewerHint" class="err-msg" style="display:none"></span></div>
-    <div class="field"><label>Ghi chú tổng hợp gửi sinh viên</label><textarea id="adminCheckNote" rows="4" maxlength="2000" placeholder="Ghi rõ nội dung cần sửa/bổ sung..."></textarea></div>
+    <div class="field"><label>Ghi chú tổng hợp gửi sinh viên</label><textarea id="adminCheckNote" rows="4" maxlength="2000" placeholder="Ghi rõ nội dung cần sửa hoặc bổ sung..."></textarea></div>
     <div id="adminCheckMessage"></div>
     <div class="modal-actions"><button id="adminCheckCancel" class="btn btn-secondary" type="button">Đóng</button><button id="adminCheckSave" class="btn btn-primary" type="button">Lưu bản kiểm tra</button></div>
   </div>
 
   <div id="lookupSubmissionModal" class="modal-box" style="display:none">
-    <h3>Tra cứu hồ sơ</h3><p class="modal-sub">Nhập MSSV để xem trạng thái xử lý hiện tại.</p>
-    <div class="field"><label>MSSV</label><input type="text" id="lookupMssv" class="modal-input" maxlength="9"></div>
+    <h3>Tra cứu hồ sơ</h3><p class="modal-sub">Nhập MSSV để xem hồ sơ của bạn đang được xử lý tới đâu.</p>
+    <div class="field"><label>MSSV</label><input type="text" id="lookupMssv" class="modal-input" maxlength="9" placeholder="VD: 202414918"></div>
     <div id="lookupResult"></div>
     <div class="modal-actions"><button id="lookupCancel" class="btn btn-secondary">Đóng</button><button id="lookupConfirm" class="btn btn-primary">Tra cứu</button></div>
   </div>

@@ -269,20 +269,64 @@ function getStepDeclarationState(key){
   }
   return "";
 }
+// Thanh bước chia làm ba chặng. Năm bước ở giữa chính là "5 tốt" nên được
+// đóng khung riêng và có kèm số tiêu chí đã khai đủ.
+const STEP_GROUPS = [
+  {label:"Mở hồ sơ", from:0, to:0},
+  {label:"Năm tiêu chí", from:1, to:5, countDone:true, five:true},
+  {label:"Hoàn thiện", from:6, to:8}
+];
+
+function makeStepPill(index){
+  const s = STEPS[index];
+  const declaration = getStepDeclarationState(s.key);
+  const statusClass = declaration || "navigation";
+  const pill = document.createElement("button");
+  pill.type = "button";
+  pill.className = `step-pill ${statusClass}${index === state.step ? " active" : ""}`;
+  const dot = document.createElement("span");
+  dot.className = "step-dot";
+  const num = document.createElement("span");
+  num.className = "step-num";
+  num.textContent = index + 1;
+  const name = document.createElement("span");
+  name.className = "step-name";
+  name.textContent = s.label;
+  pill.append(dot, num, name);
+  pill.title = declaration==="done" ? "Đã khai báo đầy đủ" : declaration==="pending" ? "Có nội dung bổ sung sau" : declaration==="incomplete" ? "Chưa khai báo đầy đủ" : "Mở mục này";
+  pill.setAttribute("aria-current", index===state.step ? "step" : "false");
+  pill.onclick = () => { state.step = index; render(); };
+  return {pill, declaration};
+}
+
 function renderSteps(){
   stepsEl.innerHTML = "";
-  STEPS.forEach((s, i) => {
-    const pill = document.createElement("button");
-    pill.type = "button";
-    const declaration=getStepDeclarationState(s.key);
-    const statusClass=declaration||"navigation";
-    pill.className = `step-pill ${statusClass}${i === state.step ? " active" : ""}`;
-    pill.textContent = (i+1) + ". " + s.label;
-    pill.title = declaration==="done" ? "Đã khai báo đầy đủ" : declaration==="pending" ? "Có nội dung bổ sung sau" : declaration==="incomplete" ? "Chưa khai báo đầy đủ" : "Mở mục này";
-    pill.setAttribute("aria-current",i===state.step?"step":"false");
-    pill.onclick = () => { state.step = i; render(); };
-    stepsEl.appendChild(pill);
+  STEP_GROUPS.forEach(group => {
+    const box = document.createElement("div");
+    box.className = "step-group" + (group.five ? " step-group-five" : "");
+    const caption = document.createElement("div");
+    caption.className = "step-group-label";
+    const pills = document.createElement("div");
+    pills.className = "step-group-pills";
+    let done = 0, total = 0;
+    for(let i = group.from; i <= group.to; i++){
+      const {pill, declaration} = makeStepPill(i);
+      total++;
+      if(declaration === "done") done++;
+      pills.appendChild(pill);
+    }
+    caption.textContent = group.countDone ? `${group.label} · ${done}/${total} đã đủ` : group.label;
+    box.append(caption, pills);
+    stepsEl.appendChild(box);
   });
+  // Màn hình hẹp: thanh bước trượt ngang, nên kéo bước đang mở vào giữa tầm nhìn.
+  const rail = stepsEl.parentElement;
+  const activePill = stepsEl.querySelector(".step-pill.active");
+  if(rail && activePill && rail.scrollWidth > rail.clientWidth){
+    const pillBox = activePill.getBoundingClientRect();
+    const railBox = rail.getBoundingClientRect();
+    rail.scrollLeft += (pillBox.left - railBox.left) - (railBox.width - pillBox.width) / 2;
+  }
 }
 
 function render(){
@@ -541,7 +585,7 @@ function renderGroupCard(container, groupDef, groupState, onChange){
   topRow.className = "criterion-card-top";
   const tag = document.createElement("span");
   tag.className = "tag";
-  tag.style.background = groupState.pending ? "#8a6d1a" : (groupState.yes === false ? "var(--err)" : (met ? "var(--ok)" : "var(--navy)"));
+  tag.style.background = groupState.pending ? "var(--cho)" : (groupState.yes === false ? "var(--err)" : (met ? "var(--ok)" : "var(--navy)"));
   tag.textContent = groupState.pending ? "BỔ SUNG SAU" : (groupState.yes === false ? "KHÔNG ĐẠT" : ((groupDef.type==="sheet"||groupDef.type==="manualList") ? `CHỌN TỐI THIỂU ${groupDef.minCount||1}` : "XÁC NHẬN"));
   topRow.appendChild(tag);
 
@@ -898,17 +942,31 @@ function renderTheLuc(){
 // Mỗi hoạt động lưu `dates` (mảng "YYYY-MM-DD") song song với `days` (số ngày quy đổi).
 // Hai giá trị này KHÁC nhau: một buổi có thể chỉ tính 0,5 ngày nên số mốc ngày
 // không nhất thiết bằng số ngày quy đổi - đúng như bản báo cáo mẫu của Ban.
+const VOLUNTEER_REQUIRED_DAYS = 5;
+
 function volunteerDatesOf(item){ return window.SV5TRules.normalizeVolunteerDates(item?.dates); }
-function formatVolunteerDates(dates){ return window.SV5TRules.formatVolunteerDates(dates); }
+function volunteerTotalDays(items){ return (items||[]).reduce((sum,it)=>sum+(Number(it.days)||0),0); }
+
+function volunteerItemExists(items,{id,name}){
+  return (items||[]).some(it =>
+    (id && it.id===id) || (name && normalizeCatalogText(it.text)===normalizeCatalogText(name))
+  );
+}
 
 function renderVolunteerDateEditor(host, item, onChange){
+  const dates = volunteerDatesOf(item);
+
+  const label = document.createElement("div");
+  label.className = "tn-field-label";
+  label.textContent = dates.length ? `Các ngày đã tham gia (${dates.length} mốc)` : "Các ngày đã tham gia";
+  host.appendChild(label);
+
   const chips = document.createElement("div");
   chips.className = "tn-date-chips";
-  const dates = volunteerDatesOf(item);
   if(!dates.length){
     const empty = document.createElement("span");
-    empty.className = "err-msg";
-    empty.textContent = "Chưa có ngày tham gia - bắt buộc điền trước khi gửi.";
+    empty.className = "tn-date-empty";
+    empty.textContent = "Chưa có ngày nào - bắt buộc điền trước khi gửi hồ sơ.";
     chips.appendChild(empty);
   }
   dates.forEach(iso => {
@@ -919,6 +977,7 @@ function renderVolunteerDateEditor(host, item, onChange){
     text.textContent = `${d}/${m}/${y}`;
     const remove = document.createElement("button");
     remove.type = "button";
+    remove.className = "tn-chip-remove";
     remove.setAttribute("aria-label", `Xóa ngày ${d}/${m}/${y}`);
     remove.textContent = "×";
     remove.onclick = () => { item.dates = volunteerDatesOf(item).filter(v => v !== iso); onChange(); };
@@ -928,17 +987,19 @@ function renderVolunteerDateEditor(host, item, onChange){
   host.appendChild(chips);
 
   const row = document.createElement("div");
-  row.className = "tn-date-row";
+  row.className = "tn-date-add";
   const input = document.createElement("input");
   input.type = "date";
   input.min = "2000-01-01";
   input.max = "2100-12-31";
+  input.setAttribute("aria-label","Chọn ngày đã tham gia");
   const add = document.createElement("button");
   add.type = "button";
+  add.className = "tn-btn-add-date";
   add.textContent = "+ Thêm ngày";
-  add.onclick = () => {
+  const commit = () => {
     const value = String(input.value || "").trim();
-    if(!window.SV5TRules.isValidVolunteerDate(value)){ appAlert("Hãy chọn một ngày hợp lệ trước khi thêm.","Thiếu ngày"); return; }
+    if(!window.SV5TRules.isValidVolunteerDate(value)){ appAlert("Hãy chọn một ngày hợp lệ trước khi thêm.","Chưa chọn ngày"); return; }
     const current = volunteerDatesOf(item);
     if(current.includes(value)){ appAlert("Ngày này đã có trong danh sách của hoạt động.","Ngày bị trùng"); return; }
     if(current.length >= window.SV5TRules.MAX_VOLUNTEER_DATES){ appAlert(`Mỗi hoạt động chỉ ghi tối đa ${window.SV5TRules.MAX_VOLUNTEER_DATES} ngày.`,"Quá nhiều ngày"); return; }
@@ -946,24 +1007,126 @@ function renderVolunteerDateEditor(host, item, onChange){
     input.value = "";
     onChange();
   };
+  add.onclick = commit;
+  input.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); commit(); } };
   row.append(input, add);
   host.appendChild(row);
 }
 
+function renderVolunteerCard(host, item, index, onChange){
+  const official = CRITERIA.tinhNguyen.find(c => c.id === item.id);
+  const noLongerOfficial = !item.proposed && !official;
+
+  const card = document.createElement("div");
+  card.className = "tn-card" + (volunteerDatesOf(item).length ? "" : " tn-card-incomplete");
+
+  const head = document.createElement("div");
+  head.className = "tn-card-head";
+  const order = document.createElement("span");
+  order.className = "tn-card-order";
+  order.textContent = index + 1;
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "tn-card-title-wrap";
+  const title = document.createElement("div");
+  title.className = "tn-card-title";
+  title.textContent = item.text;
+  const badge = document.createElement("span");
+  badge.className = "tn-badge " + (item.proposed ? "tn-badge-custom" : "tn-badge-catalog");
+  badge.textContent = item.proposed ? "Tự nhập" : "Từ danh mục của Ban";
+  titleWrap.append(title, badge);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "tn-card-remove";
+  remove.textContent = "Xóa";
+  remove.onclick = onChange.remove;
+  head.append(order, titleWrap, remove);
+  card.appendChild(head);
+
+  if(noLongerOfficial){
+    const warn = document.createElement("div");
+    warn.className = "tn-card-warning";
+    warn.textContent = "Hoạt động này không còn trong danh mục chính thức hiện tại. Ban sẽ đối chiếu thủ công.";
+    card.appendChild(warn);
+  }
+
+  const body = document.createElement("div");
+  body.className = "tn-card-body";
+
+  const daysCol = document.createElement("div");
+  daysCol.className = "tn-days-col";
+  const daysLabel = document.createElement("div");
+  daysLabel.className = "tn-field-label";
+  daysLabel.textContent = "Số ngày quy đổi";
+  const daysInput = document.createElement("input");
+  daysInput.type = "number"; daysInput.min = "0"; daysInput.step = "0.5";
+  daysInput.className = "tn-days-input";
+  daysInput.placeholder = "VD: 0.5";
+  daysInput.value = (item.days === "" || item.days === null || item.days === undefined) ? "" : String(item.days);
+  daysInput.oninput = e => {
+    const raw = e.target.value;
+    item.days = raw === "" ? "" : Number(raw);
+    onChange.refreshTotals();
+  };
+  daysCol.append(daysLabel, daysInput);
+  if(official?.yeuCau){
+    const hint = document.createElement("div");
+    hint.className = "tn-days-hint";
+    hint.textContent = `Danh mục ghi: ${official.yeuCau} ngày`;
+    daysCol.appendChild(hint);
+  }
+  body.appendChild(daysCol);
+
+  const dateCol = document.createElement("div");
+  dateCol.className = "tn-dates-col";
+  renderVolunteerDateEditor(dateCol, item, onChange.rerender);
+  body.appendChild(dateCol);
+  card.appendChild(body);
+
+  // Cho sinh viên thấy trước đúng dòng sẽ in ra trong báo cáo thành tích.
+  const preview = document.createElement("div");
+  preview.className = "tn-card-preview";
+  const previewLabel = document.createElement("span");
+  previewLabel.className = "tn-preview-label";
+  previewLabel.textContent = "Sẽ in trong báo cáo:";
+  const previewText = document.createElement("span");
+  previewText.className = "tn-preview-text";
+  previewText.textContent = window.SV5TRules.formatVolunteerItem(item);
+  preview.append(previewLabel, previewText);
+  card.appendChild(preview);
+
+  host.appendChild(card);
+}
+
 function renderTinhNguyen(){
   const tn = state.tinhNguyen;
-  const total = (tn.items || []).reduce((sum,it)=>sum+(Number(it.days)||0),0);
-  const missingDays = Math.max(0, 5-total);
+  if(!Array.isArray(tn.items)) tn.items = [];
+  tn.items.forEach(it => { if(!Array.isArray(it.dates)) it.dates = []; });
+
   contentEl.innerHTML = `
     <div class="card">
       <h2>Tình nguyện</h2>
-      <p class="sub">Chọn hoạt động trong danh mục của Ban (hoặc đề xuất hoạt động mới), ghi số ngày quy đổi và liệt kê đầy đủ các ngày đã tham gia. Nếu chưa đủ 5 ngày, hãy chủ động đánh dấu sẽ bổ sung sau.</p>
-      <div class="add-picker" id="tnPicker"></div>
-      <button type="button" class="btn btn-secondary" id="tnProposeToggle" style="margin-bottom:10px;font-size:12px"></button>
-      <div id="tnProposeHost"></div>
-      <ul class="item-list" id="tnList"></ul>
-      <div id="tnTotalBox"></div>
-      ${missingDays > 0 ? `<label class="volunteer-pending-box"><input type="checkbox" id="tnPending" ${tn.pending?"checked":""}> Thiếu/bổ sung sau ${missingDays} ngày</label>` : ""}
+      <p class="sub">Cần tổng cộng ít nhất <b>${VOLUNTEER_REQUIRED_DAYS} ngày</b> tình nguyện. Với mỗi hoạt động, ghi số ngày quy đổi và liệt kê đầy đủ các ngày đã tham gia - báo cáo sẽ in đúng theo danh sách này.</p>
+
+      <div class="tn-add-panel">
+        <div class="tn-add-block">
+          <div class="tn-field-label">Chọn từ danh mục của Ban</div>
+          <div class="tn-add-row" id="tnPicker"></div>
+        </div>
+        <div class="tn-add-divider"><span>hoặc</span></div>
+        <div class="tn-add-block">
+          <div class="tn-field-label">Tự nhập hoạt động chưa có trong danh mục</div>
+          <div class="tn-add-row">
+            <input type="text" id="tnCustomText" maxlength="500" placeholder="VD: Hỗ trợ đại hội chi đoàn - chi hội trường Điện - Điện tử">
+            <button type="button" id="tnCustomAdd">+ Thêm</button>
+          </div>
+          <div class="tn-add-note">Hoạt động tự nhập vẫn được tính; Ban sẽ đối chiếu khi duyệt minh chứng.</div>
+        </div>
+      </div>
+
+      <div id="tnSummary" class="tn-summary"></div>
+      <div id="tnCards" class="tn-cards"></div>
+      <div id="tnPendingHost"></div>
+
       <div class="fixed-block" style="margin-top:16px">
         <span class="tag">TIÊU CHÍ ƯU TIÊN - không bắt buộc</span>
         <div class="field" style="margin-top:6px"><label><input type="checkbox" id="tnKhenThuong" ${tn.khenThuong?"checked":""}> Được khen thưởng từ cấp đại học trở lên về hoạt động tình nguyện</label></div>
@@ -972,105 +1135,113 @@ function renderTinhNguyen(){
 
   const rerender = () => { markStateDirty(); renderTinhNguyen(); };
 
-  // Dropdown chọn hoạt động chính thức - dùng chung kiểu với 12 nhóm tiêu chí khác.
+  // ---- Cách 1: chọn từ danh mục chính thức ----
   const picker = document.getElementById("tnPicker");
-  const chosen = new Set((tn.items||[]).map(it=>it.id));
+  const chosen = new Set(tn.items.map(it => it.id));
   const options = CRITERIA.tinhNguyen.filter(c => !chosen.has(c.id));
   const select = document.createElement("select");
   select.id = "tnSelect";
-  if(!CRITERIA.tinhNguyen.length) select.innerHTML = `<option value="">(Ban quản trị chưa tải lên danh mục hoạt động)</option>`;
-  else if(!options.length) select.innerHTML = `<option value="">(Đã chọn hết danh sách)</option>`;
+  select.setAttribute("aria-label","Danh mục hoạt động tình nguyện");
+  if(!CRITERIA.tinhNguyen.length){ select.innerHTML = `<option value="">(Ban quản trị chưa tải lên danh mục hoạt động)</option>`; select.disabled = true; }
+  else if(!options.length){ select.innerHTML = `<option value="">(Đã chọn hết danh sách)</option>`; select.disabled = true; }
   else select.innerHTML = options.map(c => `<option value="${escapeHtmlAttr(c.id)}">${escapeHtml(c.name)}</option>`).join("");
   const addBtn = document.createElement("button");
   addBtn.type = "button"; addBtn.id = "tnAdd"; addBtn.textContent = "+ Thêm";
+  addBtn.disabled = select.disabled;
   addBtn.onclick = () => {
     const picked = CRITERIA.tinhNguyen.find(c => c.id === select.value);
     if(!picked) return;
-    tn.items.push({id:picked.id,text:picked.name,days:0,dates:[],yeuCau:picked.yeuCau||"",minhchung:picked.minhchung||""});
+    tn.items.push({id:picked.id,text:picked.name,days:"",dates:[],yeuCau:picked.yeuCau||"",minhchung:picked.minhchung||""});
     rerender();
   };
   picker.append(select, addBtn);
 
-  // Đề xuất hoạt động chưa có trong danh mục (giữ nguyên khả năng tự ghi tên).
-  const proposeToggle = document.getElementById("tnProposeToggle");
-  proposeToggle.textContent = tn.proposeOpen ? "Đóng đề xuất hoạt động" : "+ Đề xuất hoạt động";
-  proposeToggle.onclick = () => { tn.proposeOpen = !tn.proposeOpen; rerender(); };
-  if(tn.proposeOpen){
-    const host = document.getElementById("tnProposeHost");
-    const row = document.createElement("div"); row.className = "freeform-row";
-    const input = document.createElement("input");
-    input.type = "text"; input.placeholder = "Nhập tên hoạt động tình nguyện muốn đề xuất...";
-    const add = document.createElement("button"); add.type = "button"; add.textContent = "Thêm đề xuất";
-    add.onclick = () => {
-      const text = input.value.trim();
-      if(!text){ tn.proposeOpen = false; rerender(); return; }
-      const official = CRITERIA.tinhNguyen.find(c => normalizeCatalogText(c.name) === normalizeCatalogText(text));
-      tn.items.push(official
-        ? {id:official.id,text:official.name,days:0,dates:[],yeuCau:official.yeuCau||"",minhchung:official.minhchung||""}
-        : {id:newStableId('tn'),text,days:0,dates:[],proposed:true});
-      tn.proposeOpen = false;
-      rerender();
-    };
-    row.append(input, add); host.appendChild(row);
+  // ---- Cách 2: tự nhập tên hoạt động ----
+  const customInput = document.getElementById("tnCustomText");
+  const commitCustom = () => {
+    const text = customInput.value.trim();
+    if(!text){ appAlert("Vui lòng nhập tên hoạt động tình nguyện.","Thiếu tên hoạt động"); return; }
+    // Nếu gõ trùng tên một hoạt động trong danh mục thì gắn luôn vào mục chính thức.
+    const official = CRITERIA.tinhNguyen.find(c => normalizeCatalogText(c.name) === normalizeCatalogText(text));
+    if(volunteerItemExists(tn.items,{id:official?.id,name:text})){
+      appAlert("Hoạt động này đã có trong danh sách bên dưới.","Hoạt động bị trùng");
+      return;
+    }
+    tn.items.push(official
+      ? {id:official.id,text:official.name,days:"",dates:[],yeuCau:official.yeuCau||"",minhchung:official.minhchung||""}
+      : {id:newStableId('tn'),text,days:"",dates:[],proposed:true});
+    customInput.value = "";
+    rerender();
+  };
+  document.getElementById("tnCustomAdd").onclick = commitCustom;
+  customInput.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); commitCustom(); } };
+
+  // ---- Tổng hợp tiến độ ----
+  const summaryHost = document.getElementById("tnSummary");
+  const pendingHost = document.getElementById("tnPendingHost");
+  const refreshTotals = () => {
+    const total = volunteerTotalDays(tn.items);
+    const missing = Math.max(0, VOLUNTEER_REQUIRED_DAYS - total);
+    const percent = Math.min(100, Math.round(total / VOLUNTEER_REQUIRED_DAYS * 100));
+    const reached = total >= VOLUNTEER_REQUIRED_DAYS;
+    summaryHost.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "tn-summary-row";
+    const strong = document.createElement("strong");
+    strong.textContent = `${total} / ${VOLUNTEER_REQUIRED_DAYS} ngày`;
+    const status = document.createElement("span");
+    status.className = reached ? "tn-summary-ok" : "tn-summary-warn";
+    status.textContent = reached ? "Đã đủ số ngày tối thiểu" : `Còn thiếu ${missing} ngày`;
+    row.append(strong, status);
+    const bar = document.createElement("div");
+    bar.className = "tn-progress";
+    const fill = document.createElement("div");
+    fill.className = "tn-progress-fill" + (reached ? " tn-progress-done" : "");
+    fill.style.width = percent + "%";
+    bar.appendChild(fill);
+    summaryHost.append(row, bar);
+
+    // Ô "bổ sung sau" chỉ hiện khi thực sự còn thiếu ngày.
+    pendingHost.innerHTML = "";
+    if(!reached){
+      const label = document.createElement("label");
+      label.className = "volunteer-pending-box";
+      const box = document.createElement("input");
+      box.type = "checkbox"; box.id = "tnPending"; box.checked = tn.pending === true;
+      box.onchange = e => { tn.pending = e.target.checked; markStateDirty(); };
+      label.append(box, document.createTextNode(` Tôi sẽ bổ sung ${missing} ngày còn thiếu sau`));
+      pendingHost.appendChild(label);
+    } else if(tn.pending){
+      tn.pending = false;
+    }
+  };
+
+  // ---- Danh sách hoạt động ----
+  const cards = document.getElementById("tnCards");
+  if(!tn.items.length){
+    const empty = document.createElement("div");
+    empty.className = "tn-empty";
+    empty.textContent = "Chưa có hoạt động nào. Hãy chọn từ danh mục hoặc tự nhập ở trên.";
+    cards.appendChild(empty);
   }
-
-  const ul = document.getElementById("tnList");
-  (tn.items||[]).forEach((it,idx)=>{
-    if(!Array.isArray(it.dates)) it.dates = [];
-    const noLongerOfficial = !it.proposed && !CRITERIA.tinhNguyen.some(c => c.id === it.id);
-    const li = document.createElement("li");
-
-    const txt = document.createElement("span");
-    txt.className = "txt";
-    const title = document.createElement("b");
-    title.textContent = it.text;
-    txt.appendChild(title);
-    if(it.proposed){ const tag=document.createElement("span"); tag.className="hint activity-requirement"; tag.textContent="Hoạt động đề xuất thêm"; txt.appendChild(tag); }
-    else if(it.yeuCau){ const tag=document.createElement("span"); tag.className="hint activity-requirement"; tag.textContent=`Số ngày quy đổi theo danh mục: ${it.yeuCau}`; txt.appendChild(tag); }
-    if(noLongerOfficial){ const warn=document.createElement("span"); warn.className="err-msg activity-requirement"; warn.textContent="Hoạt động này không còn trong danh mục chính thức hiện tại."; txt.appendChild(warn); }
-
-    const daysField = document.createElement("div");
-    daysField.className = "tn-date-row";
-    const daysLabel = document.createElement("label");
-    daysLabel.textContent = "Số ngày quy đổi";
-    daysLabel.style.fontSize = "13px";
-    const daysInput = document.createElement("input");
-    daysInput.type = "number"; daysInput.min = "0"; daysInput.step = "0.5";
-    daysInput.style.maxWidth = "110px";
-    daysInput.value = it.days === "" || it.days === null || it.days === undefined ? "" : String(it.days);
-    daysInput.oninput = e => {
-      const raw = e.target.value;
-      it.days = raw === "" ? "" : Number(raw);
-      const box = document.getElementById("tnTotalBox");
-      const sum = (tn.items||[]).reduce((s,x)=>s+(Number(x.days)||0),0);
-      if(box) box.innerHTML = `<div class="${sum>=5?'ok-msg':'err-msg'}">Tổng số ngày tình nguyện: ${sum} ngày - ${sum>=5?'Đạt':`Còn thiếu ${Math.max(0,5-sum)} ngày`}</div>`;
-    };
-    daysField.append(daysLabel, daysInput);
-
-    const dateHost = document.createElement("div");
-    renderVolunteerDateEditor(dateHost, it, rerender);
-
-    const rm = document.createElement("button");
-    rm.type = "button"; rm.textContent = "Xóa";
-    rm.onclick = () => { tn.items.splice(idx,1); rerender(); };
-
-    li.append(txt, daysField, dateHost, rm);
-    ul.appendChild(li);
+  tn.items.forEach((item,index) => {
+    renderVolunteerCard(cards, item, index, {
+      rerender,
+      refreshTotals,
+      remove: () => { tn.items.splice(index,1); rerender(); }
+    });
   });
+  refreshTotals();
 
-  const box = document.getElementById("tnTotalBox");
-  box.innerHTML = `<div class="${total>=5?'ok-msg':'err-msg'}">Tổng số ngày tình nguyện: ${total} ngày - ${total>=5?'Đạt':`Còn thiếu ${missingDays} ngày`}</div>`;
-
-  const pending = document.getElementById("tnPending"); if(pending) pending.onchange = e => { tn.pending = e.target.checked; markStateDirty(); };
   document.getElementById("tnKhenThuong").onchange = e => tn.khenThuong = e.target.checked;
 
   const nav = navButtons(() => {
-    const currentTotal = (tn.items||[]).reduce((sum,it)=>sum+(Number(it.days)||0),0);
-    const noDays = (tn.items||[]).filter(it => !(Number(it.days) > 0)).map(it => it.text);
+    const noDays = tn.items.filter(it => !(Number(it.days) > 0)).map(it => it.text);
     if(noDays.length){ appAlert(`Chưa nhập số ngày quy đổi cho: ${noDays.slice(0,3).join("; ")}${noDays.length>3?`; và ${noDays.length-3} hoạt động khác`:""}.`,"Thiếu số ngày"); return; }
     const missingDates = window.SV5TRules.volunteerItemsMissingDates(tn.items);
     if(missingDates.length){ appAlert(`Chưa liệt kê ngày tham gia cho: ${missingDates.slice(0,3).join("; ")}${missingDates.length>3?`; và ${missingDates.length-3} hoạt động khác`:""}.`,"Thiếu ngày tham gia"); return; }
-    if(currentTotal < 5 && !tn.pending){ appAlert(`Bạn còn thiếu ${Math.max(0,5-currentTotal)} ngày. Hãy thêm hoạt động hoặc đánh dấu Thiếu/bổ sung sau.`,"Chưa khai báo đầy đủ"); return; }
+    const total = volunteerTotalDays(tn.items);
+    if(total < VOLUNTEER_REQUIRED_DAYS && !tn.pending){ appAlert(`Bạn còn thiếu ${Math.max(0,VOLUNTEER_REQUIRED_DAYS-total)} ngày. Hãy thêm hoạt động hoặc đánh dấu sẽ bổ sung sau.`,"Chưa khai báo đầy đủ"); return; }
     state.step++; render();
   });
   contentEl.appendChild(nav);
@@ -1916,7 +2087,7 @@ function buildColumnHtml(numberedItems){
   let html = "";
   let n = 1;
   numberedItems.forEach(it => {
-    const colorStyle = it.color === "red" ? ' style="color:#b3261e; font-weight:600"' : it.color === "green" ? ' style="color:#1e7d4b; font-weight:600"' : "";
+    const colorStyle = it.color === "red" ? ' style="color:var(--err); font-weight:600"' : it.color === "green" ? ' style="color:var(--ok); font-weight:600"' : "";
     if(it.plain){
       html += `<div${colorStyle}>${escapeHtml(it.text)}</div>`;
     } else {

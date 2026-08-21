@@ -102,10 +102,20 @@ test('mọi nhóm tiêu chí có hoạt động trong sheet đều dùng dropdow
   assert.match(source,/id:"HT-G5"[^\n]+type:"sheet"/);
   assert.match(source,/id:"HT-G6"[^\n]+type:"sheet"/);
   assert.match(source,/id:"HN-G1"[^\n]+type:"sheet"/);
-  // Tình nguyện dùng <select> chung kiểu, không còn ô nhập tự do + datalist.
+  // Tình nguyện có ĐỦ HAI đường thêm: chọn từ danh mục và tự nhập tên hoạt động.
   assert.match(source,/select\.id\s*=\s*"tnSelect"/);
+  assert.match(source,/id="tnCustomText"/);
+  assert.match(source,/id="tnCustomAdd"/);
+  // Cả hai đều hiện sẵn, không giấu sau nút bật/tắt như bản trước.
+  assert.doesNotMatch(source,/tn\.proposeOpen/);
   assert.doesNotMatch(source,/id="tnText"/);
   assert.doesNotMatch(source,/tnCatalogList/);
+});
+
+test('hoạt động tự nhập trùng tên với danh mục sẽ được gắn vào mục chính thức',()=>{
+  // Tránh việc cùng một hoạt động tồn tại hai bản: một "Từ danh mục", một "Tự nhập".
+  assert.match(source,/const official = CRITERIA\.tinhNguyen\.find\(c => normalizeCatalogText\(c\.name\) === normalizeCatalogText\(text\)\)/);
+  assert.match(source,/volunteerItemExists\(tn\.items,\{id:official\?\.id,name:text\}\)/);
 });
 
 test('mô tả không xác định làm import thất bại và báo đúng dòng',()=>{
