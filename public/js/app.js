@@ -269,64 +269,20 @@ function getStepDeclarationState(key){
   }
   return "";
 }
-// Thanh bước chia làm ba chặng. Năm bước ở giữa chính là "5 tốt" nên được
-// đóng khung riêng và có kèm số tiêu chí đã khai đủ.
-const STEP_GROUPS = [
-  {label:"Mở hồ sơ", from:0, to:0},
-  {label:"Năm tiêu chí", from:1, to:5, countDone:true, five:true},
-  {label:"Hoàn thiện", from:6, to:8}
-];
-
-function makeStepPill(index){
-  const s = STEPS[index];
-  const declaration = getStepDeclarationState(s.key);
-  const statusClass = declaration || "navigation";
-  const pill = document.createElement("button");
-  pill.type = "button";
-  pill.className = `step-pill ${statusClass}${index === state.step ? " active" : ""}`;
-  const dot = document.createElement("span");
-  dot.className = "step-dot";
-  const num = document.createElement("span");
-  num.className = "step-num";
-  num.textContent = index + 1;
-  const name = document.createElement("span");
-  name.className = "step-name";
-  name.textContent = s.label;
-  pill.append(dot, num, name);
-  pill.title = declaration==="done" ? "Đã khai báo đầy đủ" : declaration==="pending" ? "Có nội dung bổ sung sau" : declaration==="incomplete" ? "Chưa khai báo đầy đủ" : "Mở mục này";
-  pill.setAttribute("aria-current", index===state.step ? "step" : "false");
-  pill.onclick = () => { state.step = index; render(); };
-  return {pill, declaration};
-}
-
 function renderSteps(){
   stepsEl.innerHTML = "";
-  STEP_GROUPS.forEach(group => {
-    const box = document.createElement("div");
-    box.className = "step-group" + (group.five ? " step-group-five" : "");
-    const caption = document.createElement("div");
-    caption.className = "step-group-label";
-    const pills = document.createElement("div");
-    pills.className = "step-group-pills";
-    let done = 0, total = 0;
-    for(let i = group.from; i <= group.to; i++){
-      const {pill, declaration} = makeStepPill(i);
-      total++;
-      if(declaration === "done") done++;
-      pills.appendChild(pill);
-    }
-    caption.textContent = group.countDone ? `${group.label} · ${done}/${total} đã đủ` : group.label;
-    box.append(caption, pills);
-    stepsEl.appendChild(box);
+  STEPS.forEach((s, i) => {
+    const pill = document.createElement("button");
+    pill.type = "button";
+    const declaration=getStepDeclarationState(s.key);
+    const statusClass=declaration||"navigation";
+    pill.className = `step-pill ${statusClass}${i === state.step ? " active" : ""}`;
+    pill.textContent = (i+1) + ". " + s.label;
+    pill.title = declaration==="done" ? "Đã khai báo đầy đủ" : declaration==="pending" ? "Có nội dung bổ sung sau" : declaration==="incomplete" ? "Chưa khai báo đầy đủ" : "Mở mục này";
+    pill.setAttribute("aria-current",i===state.step?"step":"false");
+    pill.onclick = () => { state.step = i; render(); };
+    stepsEl.appendChild(pill);
   });
-  // Màn hình hẹp: thanh bước trượt ngang, nên kéo bước đang mở vào giữa tầm nhìn.
-  const rail = stepsEl.parentElement;
-  const activePill = stepsEl.querySelector(".step-pill.active");
-  if(rail && activePill && rail.scrollWidth > rail.clientWidth){
-    const pillBox = activePill.getBoundingClientRect();
-    const railBox = rail.getBoundingClientRect();
-    rail.scrollLeft += (pillBox.left - railBox.left) - (railBox.width - pillBox.width) / 2;
-  }
 }
 
 function render(){
@@ -585,7 +541,7 @@ function renderGroupCard(container, groupDef, groupState, onChange){
   topRow.className = "criterion-card-top";
   const tag = document.createElement("span");
   tag.className = "tag";
-  tag.style.background = groupState.pending ? "var(--cho)" : (groupState.yes === false ? "var(--err)" : (met ? "var(--ok)" : "var(--navy)"));
+  tag.style.background = groupState.pending ? "#8a6d1a" : (groupState.yes === false ? "var(--err)" : (met ? "var(--ok)" : "var(--navy)"));
   tag.textContent = groupState.pending ? "BỔ SUNG SAU" : (groupState.yes === false ? "KHÔNG ĐẠT" : ((groupDef.type==="sheet"||groupDef.type==="manualList") ? `CHỌN TỐI THIỂU ${groupDef.minCount||1}` : "XÁC NHẬN"));
   topRow.appendChild(tag);
 
@@ -2087,7 +2043,7 @@ function buildColumnHtml(numberedItems){
   let html = "";
   let n = 1;
   numberedItems.forEach(it => {
-    const colorStyle = it.color === "red" ? ' style="color:var(--err); font-weight:600"' : it.color === "green" ? ' style="color:var(--ok); font-weight:600"' : "";
+    const colorStyle = it.color === "red" ? ' style="color:#b3261e; font-weight:600"' : it.color === "green" ? ' style="color:#1e7d4b; font-weight:600"' : "";
     if(it.plain){
       html += `<div${colorStyle}>${escapeHtml(it.text)}</div>`;
     } else {
