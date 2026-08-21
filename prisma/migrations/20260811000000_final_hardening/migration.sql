@@ -1,0 +1,3 @@
+ALTER TABLE "AppConfig"
+ADD COLUMN "activityCatalog" JSONB,
+ADD COLUMN "reportYear" INTEGER NOT NULL DEFAULT 2025;

@@ -1,0 +1,130 @@
+// prisma/schema.prisma - sv5tot-hoso
+// ---------------------------------------------------------------------------
+// Submission: 1 dòng = 1 hồ sơ sinh viên đã bấm "Gửi cho Ban SV5T". `data` lưu
+// nguyên trạng thái form (JSON) để có thể tái tạo lại đúng bản đã gửi bất cứ
+// lúc nào (kể cả khi sau này đổi cấu trúc tiêu chí); `evidenceImages` chỉ lưu
+// metadata ảnh trong Supabase Storage (path, tên file, contentType). Ảnh thật không
+// còn được nhúng base64 vào PostgreSQL.
+//
+// AppConfig: 4 link mẫu đơn hiện ở bước "Minh chứng hoạt động", sửa được qua
+// mục Quản trị trên web (không cần đổi code/deploy lại). Mật khẩu quản trị
+// KHÔNG lưu ở đây - nằm trong biến môi trường ADMIN_PASSWORD, chỉ server biết.
+// ---------------------------------------------------------------------------
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Submission {
+  id             String   @id @default(cuid())
+  fullName       String
+  mssv           String
+  className      String
+  data           Json
+  evidenceImages Json
+  status         String   @default("Chưa kiểm tra")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  review         SubmissionReview?
+  reviewRevisions SubmissionReviewRevision[]
+
+  @@unique([mssv])
+}
+
+// Bản kiểm tra của Ban hoàn toàn tách khỏi payload gốc do sinh viên gửi.
+model SubmissionReview {
+  id           String     @id @default(cuid())
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  status       String     @default("Chưa kiểm tra")
+  note         String     @default("")
+  flags        Json       @default("{}")
+  reviewer     String
+  submissionUpdatedAt DateTime
+  checkedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  revisions    SubmissionReviewRevision[]
+}
+
+model SubmissionReviewRevision {
+  id        String           @id @default(cuid())
+  submissionId String
+  submission   Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewId     String?
+  review       SubmissionReview? @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  status    String
+  note      String
+  flags     Json
+  reviewer  String
+  submissionUpdatedAt DateTime
+  createdAt DateTime         @default(now())
+
+  @@index([submissionId, createdAt])
+  @@index([reviewId])
+}
+
+model AdminSession {
+  tokenHash String   @id
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model ApiRateLimit {
+  key       String   @id
+  count     Int
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model StorageCleanupJob {
+  path          String   @id
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastError     String   @default("")
+  lockedAt      DateTime?
+  lockedBy      String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([nextAttemptAt])
+}
+
+// Danh sách đóng các thành viên được phép đứng tên trên bản kiểm tra.
+// Giao diện chỉ chọn từ bảng này để tránh viết tắt/viết hoa không đồng nhất.
+model AdminReviewer {
+  id             String   @id @default(cuid())
+  name           String
+  normalizedName String   @unique
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([active, name])
+}
+
+model AppConfig {
+  key                  String   @id // luôn chỉ 1 dòng, key = "main"
+  linkDeXuatHoatDong   String?
+  linkXacNhanClb       String?
+  linkXacNhanNgoaiKhoa String?
+  linkXacNhanChung     String?
+  submissionsOpen      Boolean  @default(true)
+  submissionStartAt    DateTime?
+  submissionEndAt      DateTime?
+  submissionClosedMessage String @default("Hiện không trong thời gian nhận hồ sơ.")
+  activityCatalog        Json?
+  reportYear             Int      @default(2025)
+  updatedAt            DateTime @updatedAt
+}
