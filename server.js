@@ -441,7 +441,9 @@ async function serializableTransaction(work,maxAttempts=3){
   throw new Error('Không hoàn tất được giao dịch đồng thời.');
 }
 async function lockSubmissionMssv(tx,mssv){
-  await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sv5t-submission:${String(mssv||'').trim()}`},0))`);
+  // pg_advisory_xact_lock() tra ve kieu void; $queryRaw khong deserialize duoc
+  // (P2010) nen phai dung $executeRaw - khoa van duoc giu den het transaction.
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sv5t-submission:${String(mssv||'').trim()}`},0))`);
 }
 function normalizeReviewerName(value){
   return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ');
