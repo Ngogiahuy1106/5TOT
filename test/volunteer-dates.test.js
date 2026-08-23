@@ -114,3 +114,50 @@ test('backend từ chối ngày sai định dạng trong payload',()=>{
   const legacy={tinhNguyen:{items:[{text:'A',days:1}]},khac:{items:[]}};
   assert.equal(validateActivityArrays(legacy),null);
 });
+
+// ---- Chống khai trùng hoạt động tình nguyện ----
+// Tổng ngày tình nguyện được cộng dồn theo từng dòng, nên hai dòng trùng tên là
+// một cách thổi phồng số ngày để chạm mốc 5 ngày. Chặn theo mã không bắt được
+// vì mỗi đề xuất tự sinh một mã riêng.
+
+test('backend chặn hai hoạt động tình nguyện trùng tên dù khác mã',()=>{
+  const validateActivityArrays=runServerFn('function validateActivityArrays(data){','\nfunction validateGroupMaps');
+
+  const spacingAndCase={tinhNguyen:{items:[
+    {id:'tn-1',text:'Mùa hè xanh',days:3,dates:['2025-07-01']},
+    {id:'tn-2',text:'  MÙA  HÈ   XANH ',days:3,dates:['2025-07-02']}
+  ]},khac:{items:[]}};
+  assert.match(String(validateActivityArrays(spacingAndCase)),/tình nguyện bị trùng tên/);
+
+  const noDiacritics={tinhNguyen:{items:[
+    {id:'tn-1',text:'Mùa hè xanh',days:3,dates:['2025-07-01']},
+    {id:'tn-2',text:'mua he xanh',days:3,dates:['2025-07-02']}
+  ]},khac:{items:[]}};
+  assert.match(String(validateActivityArrays(noDiacritics)),/tình nguyện bị trùng tên/);
+
+  const distinct={tinhNguyen:{items:[
+    {id:'tn-1',text:'Mùa hè xanh',days:3,dates:['2025-07-01']},
+    {id:'tn-2',text:'Hiến máu',days:2,dates:['2025-07-02']}
+  ]},khac:{items:[]}};
+  assert.equal(validateActivityArrays(distinct),null);
+
+  const otherAchievements={tinhNguyen:{items:[]},khac:{items:[
+    {id:'k-1',text:'Giải nhất NCKH'},{id:'k-2',text:'giai nhat  nckh'}
+  ]}};
+  assert.match(String(validateActivityArrays(otherAchievements)),/thành tích khác bị trùng tên/);
+});
+
+test('frontend và backend dùng chung một luật so trùng tên tình nguyện',()=>{
+  const appSource=fs.readFileSync(require.resolve('../public/js/app.js'),'utf8');
+  const block=appSource.slice(appSource.indexOf('function volunteerDatesOf'),appSource.indexOf('function renderVolunteerDateEditor'));
+  const ctx={window:{SV5TRules}};
+  vm.createContext(ctx);
+  vm.runInContext(block+'\nglobalThis.exists=volunteerItemExists;',ctx);
+
+  const items=[{id:'tn-1',text:'Mùa hè xanh'}];
+  assert.equal(ctx.exists(items,{name:'  MÙA  HÈ  XANH '}),true,'khác hoa thường và khoảng trắng vẫn là trùng');
+  assert.equal(ctx.exists(items,{name:'mua he xanh'}),true,'bỏ dấu vẫn là trùng');
+  assert.equal(ctx.exists(items,{name:'Hiến máu'}),false);
+  assert.equal(ctx.exists(items,{id:'tn-1'}),true,'trùng mã vẫn phải bắt được');
+  assert.equal(ctx.exists([],{name:'Mùa hè xanh'}),false);
+});

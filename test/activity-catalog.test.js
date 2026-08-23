@@ -114,8 +114,11 @@ test('mọi nhóm tiêu chí có hoạt động trong sheet đều dùng dropdow
 
 test('hoạt động tự nhập trùng tên với danh mục sẽ được gắn vào mục chính thức',()=>{
   // Tránh việc cùng một hoạt động tồn tại hai bản: một "Từ danh mục", một "Tự nhập".
-  assert.match(source,/const official = CRITERIA\.tinhNguyen\.find\(c => normalizeCatalogText\(c\.name\) === normalizeCatalogText\(text\)\)/);
+  // So khớp bằng normalizeActivityName của shared-rules - cùng một luật với bước
+  // đề xuất của các nhóm khác và với validateActivityArrays ở backend.
+  assert.match(source,/const official = CRITERIA\.tinhNguyen\.find\(c => window\.SV5TRules\.normalizeActivityName\(c\.name\) === key\)/);
   assert.match(source,/volunteerItemExists\(tn\.items,\{id:official\?\.id,name:text\}\)/);
+  assert.doesNotMatch(source,/normalizeCatalogText\(c\.name\) === normalizeCatalogText\(text\)/,"không được quay lại normalizer riêng của bước tình nguyện");
 });
 
 test('mô tả không xác định làm import thất bại và báo đúng dòng',()=>{

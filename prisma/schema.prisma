@@ -3,7 +3,7 @@
 // Submission: 1 dòng = 1 hồ sơ sinh viên đã bấm "Gửi cho Ban SV5T". `data` lưu
 // nguyên trạng thái form (JSON) để có thể tái tạo lại đúng bản đã gửi bất cứ
 // lúc nào (kể cả khi sau này đổi cấu trúc tiêu chí); `evidenceImages` chỉ lưu
-// metadata ảnh trong Supabase Storage (path, tên file, contentType). Ảnh thật không
+// metadata ảnh trong Cloudflare R2 (path, tên file, contentType). Ảnh thật không
 // còn được nhúng base64 vào PostgreSQL.
 //
 // AppConfig: 4 link mẫu đơn hiện ở bước "Minh chứng hoạt động", sửa được qua

@@ -621,7 +621,16 @@ function renderGroupCard(container, groupDef, groupState, onChange){
       const proposeRow=document.createElement("div"); proposeRow.className="freeform-row";
       const input=document.createElement("input"); input.type="text"; input.placeholder="Nhập tên hoạt động muốn đề xuất thêm...";
       const add=document.createElement("button"); add.type="button"; add.textContent="Thêm đề xuất";
-      add.onclick=()=>{ const v=input.value.trim(); if(!v){ groupState.proposeOpen=false; onChange(); return; } groupState.items.push({id:"PROPOSED-"+Date.now(),name:v,proposed:true}); groupState.proposeOpen=false; onChange(); };
+      add.onclick=()=>{
+        const resolved=resolveProposedActivity(input.value,groupDef.items,groupState.items);
+        if(resolved.status==="empty"){ groupState.proposeOpen=false; onChange(); return; }
+        if(resolved.status==="duplicate"){ appAlert(`Hoạt động “${resolved.name}” đã có trong danh sách bên dưới.`,"Hoạt động bị trùng"); return; }
+        groupState.items.push(resolved.item);
+        groupState.proposeOpen=false;
+        onChange();
+        // Thông báo sau khi render lại để modal không bị xoá cùng nội dung bước.
+        if(resolved.status==="official") appAlert(`“${resolved.item.name}” đã có trong danh mục chính thức nên được thêm như hoạt động chính thức, không tính là đề xuất.`,"Đã có trong danh mục");
+      };
       proposeRow.append(input,add); wrap.appendChild(proposeRow);
     }
   } else if(groupDef.type === "manualList"){
@@ -903,9 +912,12 @@ const VOLUNTEER_REQUIRED_DAYS = 5;
 function volunteerDatesOf(item){ return window.SV5TRules.normalizeVolunteerDates(item?.dates); }
 function volunteerTotalDays(items){ return (items||[]).reduce((sum,it)=>sum+(Number(it.days)||0),0); }
 
+// So trùng bằng normalizeActivityName của shared-rules - cùng một luật với bước
+// đề xuất của các nhóm khác và với validate ở backend, để ba nơi không lệch nhau.
 function volunteerItemExists(items,{id,name}){
+  const key = name ? window.SV5TRules.normalizeActivityName(name) : "";
   return (items||[]).some(it =>
-    (id && it.id===id) || (name && normalizeCatalogText(it.text)===normalizeCatalogText(name))
+    (id && it.id===id) || (key && window.SV5TRules.normalizeActivityName(it.text)===key)
   );
 }
 
@@ -1118,9 +1130,10 @@ function renderTinhNguyen(){
     const text = customInput.value.trim();
     if(!text){ appAlert("Vui lòng nhập tên hoạt động tình nguyện.","Thiếu tên hoạt động"); return; }
     // Nếu gõ trùng tên một hoạt động trong danh mục thì gắn luôn vào mục chính thức.
-    const official = CRITERIA.tinhNguyen.find(c => normalizeCatalogText(c.name) === normalizeCatalogText(text));
+    const key = window.SV5TRules.normalizeActivityName(text);
+    const official = CRITERIA.tinhNguyen.find(c => window.SV5TRules.normalizeActivityName(c.name) === key);
     if(volunteerItemExists(tn.items,{id:official?.id,name:text})){
-      appAlert("Hoạt động này đã có trong danh sách bên dưới.","Hoạt động bị trùng");
+      appAlert(`Hoạt động “${official ? official.name : text}” đã có trong danh sách bên dưới.`,"Hoạt động bị trùng");
       return;
     }
     tn.items.push(official
@@ -1128,6 +1141,8 @@ function renderTinhNguyen(){
       : {id:newStableId('tn'),text,days:"",dates:[],proposed:true});
     customInput.value = "";
     rerender();
+    // Thông báo sau khi render lại để modal không bị xóa cùng nội dung bước.
+    if(official) appAlert(`“${official.name}” đã có trong danh mục chính thức nên được thêm như hoạt động chính thức, không tính là đề xuất.`,"Đã có trong danh mục");
   };
   document.getElementById("tnCustomAdd").onclick = commitCustom;
   customInput.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); commitCustom(); } };
@@ -2641,6 +2656,26 @@ function normalizeVN(s){
 
 function normalizeCatalogText(value){
   return normalizeVN(value).replace(/\s+/g," ");
+}
+
+// Một đề xuất phải được đối chiếu trước khi thêm:
+//  - trùng tên trong danh mục chính thức -> thêm như mục chính thức, KHÔNG gắn
+//    cờ proposed (nếu không báo cáo sẽ tô xanh như đề xuất mới và Ban phải đi
+//    thẩm định một hoạt động vốn đã có sẵn);
+//  - trùng tên đã có trong danh sách -> từ chối, vì điều kiện đạt chỉ đếm
+//    items.length nên hai dòng trùng tên sẽ thoả minCount một cách sai lệch.
+function resolveProposedActivity(rawName,catalogItems,existingItems){
+  const name=String(rawName||"").trim();
+  if(!name) return {status:"empty"};
+  const key=window.SV5TRules.normalizeActivityName(name);
+  const catalog=Array.isArray(catalogItems)?catalogItems:[];
+  const existing=Array.isArray(existingItems)?existingItems:[];
+  const official=catalog.find(entry=>window.SV5TRules.normalizeActivityName(entry.name)===key);
+  if(existing.some(item=>window.SV5TRules.normalizeActivityName(item.name)===key||(official&&item.id===official.id))){
+    return {status:"duplicate",name:official?official.name:name};
+  }
+  if(official) return {status:"official",item:{id:official.id,name:official.name,yeuCau:official.yeuCau||"",minhchung:official.minhchung||""}};
+  return {status:"proposed",item:{id:newStableId("proposed"),name,proposed:true}};
 }
 
 function resolveActivityCatalogKey(category,type,description){

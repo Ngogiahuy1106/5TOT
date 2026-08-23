@@ -5,6 +5,16 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
 
+  // Chuẩn hoá tên hoạt động để so trùng: bỏ dấu, thường hoá, gộp khoảng trắng.
+  // Dùng chung cho frontend (chặn đề xuất trùng) và backend (validate payload)
+  // để hai bên không lệch luật so khớp.
+  function normalizeActivityName(value){
+    return String(value||'')
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/đ/g,'d').replace(/Đ/g,'D')
+      .toLowerCase().trim().replace(/\s+/g,' ');
+  }
+
   const GPA_THRESHOLDS=Object.freeze({thuong:2.8,canBoDoan:2.5,traoDoi:2.8});
   const GROUP_VALIDATION_RULES=Object.freeze({
     'DD-G1':{kind:'list',min:1},'DD-G2':{kind:'rank'},'DD-G3':{kind:'rank'},'DD-G4':{kind:'list',min:1},'DD-G5':{kind:'yesno'},
@@ -129,6 +139,6 @@
       .map(item=>String(item?.text||'').trim()||'(hoạt động chưa đặt tên)');
   }
 
-  return Object.freeze({GPA_THRESHOLDS,GROUP_VALIDATION_RULES,REQUIRED_GROUPS,isPlainObject,calculateWeightedGpa,getGpaThreshold,evaluateAcademicMinimum,evaluateHardEligibility,groupStateComplete,missingRequiredDeclarations,reviewStatusAllowed,
+  return Object.freeze({GPA_THRESHOLDS,GROUP_VALIDATION_RULES,REQUIRED_GROUPS,isPlainObject,normalizeActivityName,calculateWeightedGpa,getGpaThreshold,evaluateAcademicMinimum,evaluateHardEligibility,groupStateComplete,missingRequiredDeclarations,reviewStatusAllowed,
     MAX_VOLUNTEER_DATES,isValidVolunteerDate,normalizeVolunteerDates,formatVolunteerDates,formatVolunteerItem,volunteerItemsMissingDates});
 });

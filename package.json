@@ -1,12 +1,13 @@
 {
   "name": "sv5tot-hoso",
   "version": "1.0.0",
-  "description": "Ho so Sinh vien 5 tot - Express + Prisma + PostgreSQL (Supabase).",
+  "description": "Ho so Sinh vien 5 tot - Express + Prisma + PostgreSQL (Supabase) + Cloudflare R2 storage.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "check:r2": "node scripts/check-r2.js",
     "postinstall": "prisma generate"
   },
   "engines": {

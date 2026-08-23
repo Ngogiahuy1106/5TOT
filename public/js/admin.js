@@ -49,7 +49,7 @@ const API_SCOPE_LABEL = Object.freeze({
   input:        {title:"Dữ liệu chưa hợp lệ",          hint:"Máy chủ từ chối vì nội dung gửi lên chưa đúng. Hãy sửa theo mô tả bên trên rồi gửi lại; không có dữ liệu nào bị thay đổi."},
   conflict:     {title:"Dữ liệu đã thay đổi",          hint:"Có người khác vừa cập nhật cùng dữ liệu này. Hãy tải lại rồi thao tác trên bản mới nhất."},
   notfound:     {title:"Không tìm thấy dữ liệu",       hint:"Mục bạn thao tác không còn tồn tại, có thể vừa bị xóa. Hãy tải lại danh sách."},
-  storage:      {title:"Kho ảnh minh chứng gián đoạn", hint:"Máy chủ ảnh (Supabase Storage) đang không truy cập được. Dữ liệu cũ KHÔNG bị thay đổi. Hãy báo Ban quản trị và thử lại sau ít phút."},
+  storage:      {title:"Kho ảnh minh chứng gián đoạn", hint:"Máy chủ ảnh (Cloudflare R2) đang không truy cập được. Dữ liệu cũ KHÔNG bị thay đổi. Hãy báo Ban quản trị và thử lại sau ít phút."},
   database:     {title:"Cơ sở dữ liệu gián đoạn",      hint:"Máy chủ không đọc/ghi được cơ sở dữ liệu. Hãy thử lại sau ít phút và báo Ban quản trị nếu vẫn lỗi."},
   unavailable:  {title:"Máy chủ đang bận",             hint:"Một dịch vụ phụ trợ đang tạm gián đoạn. Dữ liệu chưa bị thay đổi. Hãy thử lại sau ít phút."},
   server:       {title:"Máy chủ gặp lỗi",              hint:"Lỗi nằm ở phía máy chủ, không phải do dữ liệu bạn nhập. Hãy thử lại; nếu vẫn lỗi, báo Ban quản trị kèm thời điểm gặp lỗi."},

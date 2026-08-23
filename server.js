@@ -12,10 +12,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ALLOWED_STATUSES = new Set(['Chưa kiểm tra', 'Đã duyệt', 'Cần bổ sung']);
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || '';
+const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
+const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_BUCKET = (process.env.R2_BUCKET || '').trim();
+const R2_REGION = 'auto';
+const R2_HOST = R2_ACCOUNT_ID ? `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '';
+// Ghim CSP vao dung endpoint cua tai khoan nay. Dung *.r2.cloudflarestorage.com
+// se cho phep bucket cua bat ky tai khoan Cloudflare nao khac tro anh vao trang.
+const R2_CSP_ORIGIN = R2_HOST ? `https://${R2_HOST}` : '';
 const STORAGE_SIGNED_URL_TTL = 15 * 60;
+// Tran thoi gian cho mot lo xoa chay dong bo trong request; qua han thi phan
+// con lai chuyen sang hang doi StorageCleanupJob.
+const STORAGE_DELETE_DEADLINE_MS = 10_000;
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const SIGNED_URL_CACHE = new Map();
 const STORAGE_WORKER_ID = crypto.randomUUID();
@@ -35,7 +44,7 @@ app.use((req,res,next)=>{
   res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
   if(process.env.NODE_ENV==='production'||process.env.RENDER) res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob: https://*.supabase.co; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';");
+  res.setHeader('Content-Security-Policy', `default-src 'self'; img-src 'self' data: blob:${R2_CSP_ORIGIN ? ' ' + R2_CSP_ORIGIN : ''}; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self'${R2_CSP_ORIGIN ? ' ' + R2_CSP_ORIGIN : ''}; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';`);
   next();
 });
 app.use(express.static(path.join(__dirname, 'public')));
@@ -177,16 +186,86 @@ if(typeof limiterCleanup.unref==='function') limiterCleanup.unref();
 const storageCleanup=setInterval(()=>processStorageCleanupJobs().catch(err=>console.error('[storage] cleanup worker:',err.message)),60_000);
 if(typeof storageCleanup.unref==='function') storageCleanup.unref();
 
+// ---- Cloudflare R2 (S3-compatible, AWS Signature V4) ------------------------
+// R2 không có endpoint "sign" sẵn như Supabase Storage: mọi request phải tự ký
+// bằng SigV4. Bù lại, việc tạo link xem ảnh (presign) là phép tính cục bộ nên
+// không tốn round-trip mạng và không tính vào quota operation của R2.
 function storageIsConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && SUPABASE_STORAGE_BUCKET);
+  return Boolean(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET);
 }
 
-function storageHeaders(extra = {}) {
+// RFC 3986: AWS chỉ để nguyên A-Z a-z 0-9 - _ . ~ ; encodeURIComponent bỏ sót ! ' ( ) *
+function uriEncode(value, encodeSlash = true) {
+  let out = encodeURIComponent(String(value)).replace(/[!'()*]/g, ch => '%' + ch.charCodeAt(0).toString(16).toUpperCase());
+  if (!encodeSlash) out = out.replace(/%2F/g, '/');
+  return out;
+}
+
+const sha256Hex = data => crypto.createHash('sha256').update(data).digest('hex');
+
+function amzTimestamps() {
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+  return { amzDate, dateStamp: amzDate.slice(0, 8) };
+}
+
+function r2SigningKey(dateStamp) {
+  const hmac = (key, data) => crypto.createHmac('sha256', key).update(data).digest();
+  return hmac(hmac(hmac(hmac('AWS4' + R2_SECRET_ACCESS_KEY, dateStamp), R2_REGION), 's3'), 'aws4_request');
+}
+
+function canonicalQueryString(query) {
+  return Object.keys(query).sort().map(key => `${uriEncode(key)}=${uriEncode(query[key])}`).join('&');
+}
+
+// R2 dùng path-style: https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
+function r2CanonicalUri(objectPath) {
+  return `/${uriEncode(R2_BUCKET)}${objectPath ? `/${uriEncode(objectPath, false)}` : ''}`;
+}
+
+// Ký bằng Authorization header - dùng cho request đi từ server (PUT/DELETE/GET).
+function signR2Request({ method, objectPath = '', query = {}, headers = {}, body = null }) {
+  const { amzDate, dateStamp } = amzTimestamps();
+  const payloadHash = sha256Hex(body === null ? '' : body);
+  const table = {};
+  for (const [name, value] of Object.entries({ ...headers, host: R2_HOST, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate })) {
+    table[name.toLowerCase()] = String(value).trim().replace(/\s+/g, ' ');
+  }
+  const names = Object.keys(table).sort();
+  const canonicalHeaders = names.map(name => `${name}:${table[name]}\n`).join('');
+  const signedHeaders = names.join(';');
+  const canonicalQuery = canonicalQueryString(query);
+  const canonicalUri = r2CanonicalUri(objectPath);
+  const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  const scope = `${dateStamp}/${R2_REGION}/s3/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const signature = crypto.createHmac('sha256', r2SigningKey(dateStamp)).update(stringToSign).digest('hex');
   return {
-    apikey: SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    ...extra,
+    url: `https://${R2_HOST}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
+    headers: {
+      ...headers,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': amzDate,
+      Authorization: `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    },
   };
+}
+
+// Ký vào query string - link tạm cho trình duyệt tải ảnh trực tiếp từ R2.
+function presignR2Get(objectPath, expiresIn) {
+  const { amzDate, dateStamp } = amzTimestamps();
+  const scope = `${dateStamp}/${R2_REGION}/s3/aws4_request`;
+  const canonicalQuery = canonicalQueryString({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${R2_ACCESS_KEY_ID}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresIn),
+    'X-Amz-SignedHeaders': 'host',
+  });
+  const canonicalUri = r2CanonicalUri(objectPath);
+  const canonicalRequest = ['GET', canonicalUri, canonicalQuery, `host:${R2_HOST}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const signature = crypto.createHmac('sha256', r2SigningKey(dateStamp)).update(stringToSign).digest('hex');
+  return `https://${R2_HOST}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
 }
 
 async function storageFetch(url,options={},timeoutMs=15_000){
@@ -195,10 +274,6 @@ async function storageFetch(url,options={},timeoutMs=15_000){
   if(typeof timer.unref==='function') timer.unref();
   try{return await fetch(url,{...options,signal:controller.signal});}
   finally{clearTimeout(timer);}
-}
-
-function encodeStoragePath(objectPath) {
-  return String(objectPath).split('/').map(encodeURIComponent).join('/');
 }
 
 function sanitizeFilePart(value) {
@@ -280,26 +355,28 @@ function evidenceFolder(key) {
 
 async function verifyStorageBucket() {
   if (!storageIsConfigured()) {
-    throw new Error('Thiếu SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY hoặc SUPABASE_STORAGE_BUCKET trong .env.');
+    throw new Error('Thiếu R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY hoặc R2_BUCKET trong .env.');
   }
-  const bucketUrl = `${SUPABASE_URL}/storage/v1/bucket/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}`;
-  const check = await storageFetch(bucketUrl, { headers: storageHeaders() });
+  // ListObjectsV2 với max-keys=1: xác nhận bucket tồn tại và token đủ quyền mà
+  // không tải về dữ liệu thật. R2 không cho đọc trạng thái public qua S3 API
+  // (public access cấu hình bằng r2.dev / custom domain) nên bỏ cảnh báo public.
+  const signed = signR2Request({ method: 'GET', query: { 'list-type': '2', 'max-keys': '1' } });
+  const check = await storageFetch(signed.url, { headers: signed.headers });
   if (!check.ok) {
-    const detail = await check.text();
-    if (check.status === 404 || check.status === 400) {
-      throw new Error(`Bucket "${SUPABASE_STORAGE_BUCKET}" chưa tồn tại. Hãy tạo bucket private này trước trong Supabase Storage.`);
+    const detail = (await check.text().catch(() => '')).slice(0, 400);
+    if (check.status === 404) {
+      throw new Error(`Bucket "${R2_BUCKET}" chưa tồn tại. Hãy tạo bucket private này trước trong Cloudflare R2.`);
     }
-    throw new Error(`Không kiểm tra được bucket "${SUPABASE_STORAGE_BUCKET}": ${detail || check.status}`);
+    if (check.status === 401 || check.status === 403) {
+      throw new Error(`API token R2 bị từ chối hoặc không đủ quyền trên bucket "${R2_BUCKET}". Kiểm tra lại Access Key ID / Secret Access Key và phạm vi của token.`);
+    }
+    throw new Error(`Không kiểm tra được bucket "${R2_BUCKET}": ${detail || check.status}`);
   }
-  const bucket = await check.json().catch(() => ({}));
-  if (bucket.public === true) {
-    console.warn(`[WARN] Bucket ${SUPABASE_STORAGE_BUCKET} đang là public. Nên chuyển sang private để bảo vệ minh chứng.`);
-  }
-  console.log(`[storage] Đã kết nối bucket: ${SUPABASE_STORAGE_BUCKET}`);
+  console.log(`[storage] Đã kết nối bucket R2: ${R2_BUCKET}`);
 }
 
 async function uploadEvidenceImages(mssv, evidenceImages, protectedPaths = new Set()) {
-  if (!storageIsConfigured()) throw new Error('Supabase Storage chưa được cấu hình đầy đủ trên máy chủ.');
+  if (!storageIsConfigured()) throw new Error('Cloudflare R2 chưa được cấu hình đầy đủ trên máy chủ.');
   const result = {};
   const uploadedPaths = [];
   try {
@@ -312,18 +389,22 @@ async function uploadEvidenceImages(mssv, evidenceImages, protectedPaths = new S
       const version = crypto.randomUUID().replace(/-/g,'').slice(0,12);
       const objectName = `${sanitizeFilePart(key)}-${version}.${extension}`;
       const objectPath = `${sanitizeFilePart(mssv)}/${folder}/${objectName}`;
-      const response = await storageFetch(`${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${encodeStoragePath(objectPath)}`, {
-        method: 'POST',
-        headers: storageHeaders({ 'Content-Type': contentType, 'x-upsert': 'false', 'Cache-Control': '3600' }),
+      // Không cần cờ chống ghi đè như x-upsert:false của Supabase: objectPath đã
+      // chứa version ngẫu nhiên 12 ký tự hex nên không thể trùng khóa đang có.
+      const signed = signR2Request({
+        method: 'PUT',
+        objectPath,
+        headers: { 'Content-Type': contentType, 'Cache-Control': 'private, max-age=3600' },
         body: buffer,
       });
+      const response = await storageFetch(signed.url, { method: 'PUT', headers: signed.headers, body: buffer });
       if (!response.ok) {
         const detail = await response.text();
         const error=new Error(`Không upload được ảnh ${originalName}: ${detail || response.status}`);error.code='STORAGE_UPLOAD';throw error;
       }
       uploadedPaths.push(objectPath);
       result[key] = {
-        bucket: SUPABASE_STORAGE_BUCKET,
+        bucket: R2_BUCKET,
         name: image.name || originalName,
         path: objectPath,
         size: buffer.length,
@@ -348,22 +429,53 @@ async function enqueueStorageCleanup(paths,lastError){
     }).catch(err=>console.error('[storage] Không ghi được cleanup job:',err.message));
   }
 }
-async function deleteStorageObjects(paths,{throwOnFailure=false,queueOnFailure=false}={}) {
-  const prefixes = [...new Set((paths || []).filter(Boolean))];
-  if (!prefixes.length || !storageIsConfigured()) return true;
+// Trả về '' nếu xóa xong, ngược lại trả về mô tả lỗi cuối cùng.
+async function deleteOneStorageObject(objectPath){
   let lastError='';
   for(let attempt=1;attempt<=3;attempt++){
     try{
-      const response = await storageFetch(`${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}`, {
-        method: 'DELETE', headers: storageHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ prefixes }),
-      });
-      if(response.ok){prefixes.forEach(p=>SIGNED_URL_CACHE.delete(p));return true;}
-      lastError=await response.text();
+      const signed=signR2Request({method:'DELETE',objectPath});
+      const response=await storageFetch(signed.url,{method:'DELETE',headers:signed.headers});
+      // S3/R2 trả 204 kể cả khi object đã không còn - coi như xóa thành công.
+      if(response.ok||response.status===404) return '';
+      lastError=`${response.status} ${(await response.text().catch(()=>'')).slice(0,300)}`;
     }catch(err){ lastError=err.message; }
     if(attempt<3) await new Promise(r=>setTimeout(r,150*attempt));
   }
+  return lastError||'unknown error';
+}
+// R2 không có API xóa theo mảng prefix như Supabase (một request xóa cả lô);
+// DeleteObjects của S3 cần body XML + Content-MD5 nên ở đây xóa từng object.
+//
+// Một hồ sơ có thể có tới 80 ảnh và tới 160 khóa cần xóa (xem phần validate bên
+// dưới), nên xóa tuần tự sẽ biến một sự cố R2 thành hàng giờ treo request. Vì
+// vậy chạy tối đa 5 luồng song song, và sau STORAGE_DELETE_DEADLINE_MS thì
+// ngừng nhận object mới - phần chưa xong được đẩy sang hàng đợi
+// StorageCleanupJob để worker nền dọn sau. Hạn chót chỉ chặn việc BẮT ĐẦU một
+// object mới chứ không cắt ngang object đang chạy, nên lời gọi chỉ có một
+// object (worker dọn dẹp) không bị ảnh hưởng.
+async function deleteStorageObjects(paths,{throwOnFailure=false,queueOnFailure=false}={}) {
+  const objectPaths = [...new Set((paths || []).filter(Boolean))];
+  if (!objectPaths.length || !storageIsConfigured()) return true;
+  const deadline=Date.now()+STORAGE_DELETE_DEADLINE_MS;
+  const failed=[];let lastError='',cursor=0;
+  async function worker(){
+    while(cursor<objectPaths.length){
+      const objectPath=objectPaths[cursor++];
+      if(Date.now()>=deadline){
+        failed.push(objectPath);
+        lastError=lastError||'Quá hạn chờ xóa; phần còn lại đã chuyển sang hàng đợi dọn dẹp.';
+        continue;
+      }
+      const err=await deleteOneStorageObject(objectPath);
+      if(err){failed.push(objectPath);lastError=err;}
+      else SIGNED_URL_CACHE.delete(objectPath);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(5,objectPaths.length)},()=>worker()));
+  if(!failed.length) return true;
   console.error('[storage] DELETE failed:',lastError);
-  if(queueOnFailure) await enqueueStorageCleanup(prefixes,lastError);
+  if(queueOnFailure) await enqueueStorageCleanup(failed,lastError);
   if(throwOnFailure) throw new Error('Không xóa được tệp minh chứng trên Storage.');
   return false;
 }
@@ -401,17 +513,14 @@ async function createSignedUrl(objectPath) {
   if (!objectPath || !storageIsConfigured()) return '';
   const cached=SIGNED_URL_CACHE.get(objectPath);
   if(cached && cached.expiresAt>Date.now()+60_000) return cached.url;
+  // Presign là phép tính cục bộ nên không thể lỗi mạng; vẫn giữ cache để cùng
+  // một ảnh nhận cùng một URL trong 15 phút, nhờ đó trình duyệt cache được ảnh
+  // thay vì tải lại từ R2 mỗi lần mở trang.
   try{
-    const response = await storageFetch(`${SUPABASE_URL}/storage/v1/object/sign/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${encodeStoragePath(objectPath)}`, {
-      method: 'POST',headers: storageHeaders({ 'Content-Type': 'application/json' }),body: JSON.stringify({ expiresIn: STORAGE_SIGNED_URL_TTL }),
-    });
-    if (!response.ok) return '';
-    const payload = await response.json(),signed = payload.signedURL || payload.signedUrl || '';
-    if (!signed) return '';
-    const url=/^https?:\/\//i.test(signed)?signed:`${SUPABASE_URL}/storage/v1${signed.startsWith('/') ? signed : `/${signed}`}`;
+    const url=presignR2Get(objectPath,STORAGE_SIGNED_URL_TTL);
     SIGNED_URL_CACHE.set(objectPath,{url,expiresAt:Date.now()+STORAGE_SIGNED_URL_TTL*1000});
     return url;
-  }catch(err){console.error('[storage] SIGN failed:',err.message);storageReady=false;return '';}
+  }catch(err){console.error('[storage] SIGN failed:',err.message);return '';}
 }
 
 async function hydrateEvidenceImageUrls(evidenceImages) {
@@ -705,8 +814,22 @@ function validateActivityArrays(data){
     }
   }
   for(const item of data.khac?.items||[]) if(!item||typeof item!=='object'||!String(item.text||'').trim()||String(item.text).length>500) return 'Thành tích khác không hợp lệ.';
+  // Chặn theo mã không đủ: mỗi đề xuất tự sinh một mã riêng nên hai dòng cùng tên
+  // vẫn lọt. Với tình nguyện thì đây là lỗ hổng thật, vì tổng ngày được cộng dồn
+  // theo từng dòng nên khai trùng một hoạt động sẽ thổi phồng số ngày đạt được.
+  // Dùng đúng normalizeActivityName mà frontend dùng để hai bên không lệch luật.
   for(const [label,items] of [['tình nguyện',data.tinhNguyen?.items||[]],['thành tích khác',data.khac?.items||[]]]){
-    const ids=new Set();for(const item of items){const id=String(item?.id||'').trim();if(id&&(id.length>150||ids.has(id)))return `Mã hoạt động ${label} bị trùng hoặc quá dài.`;if(id)ids.add(id);}
+    const ids=new Set(),names=new Set();
+    for(const item of items){
+      const id=String(item?.id||'').trim();
+      if(id&&(id.length>150||ids.has(id)))return `Mã hoạt động ${label} bị trùng hoặc quá dài.`;
+      if(id)ids.add(id);
+      const nameKey=SV5TRules.normalizeActivityName(item?.text);
+      if(nameKey){
+        if(names.has(nameKey))return `Hoạt động ${label} bị trùng tên.`;
+        names.add(nameKey);
+      }
+    }
   }
   return null;
 }
@@ -724,10 +847,15 @@ function validateGroupMaps(data){
       const gs=states[id];if(!SV5TRules.isPlainObject(gs))return `${label}: thiếu trạng thái ${id}.`;
       if(gs.items!==undefined){
         if(!Array.isArray(gs.items)||gs.items.length>100)return `${label}: danh sách hoạt động ${id} không hợp lệ.`;
-        const ids=new Set();
+        const ids=new Set(),names=new Set();
         for(const item of gs.items){
           if(!SV5TRules.isPlainObject(item)||!String(item.name||'').trim()||String(item.name).length>500)return `${label}: hoạt động trong ${id} không hợp lệ.`;
           const itemId=String(item.id||item.name||'');if(itemId.length>150||ids.has(itemId))return `${label}: hoạt động trong ${id} bị trùng hoặc có mã quá dài.`;ids.add(itemId);
+          // Mỗi đề xuất nhận một mã riêng nên chống trùng theo mã không bắt được
+          // hai đề xuất cùng tên; điều kiện đạt chỉ đếm số phần tử nên phải chặn.
+          const nameKey=SV5TRules.normalizeActivityName(item.name);
+          if(names.has(nameKey))return `${label}: hoạt động trong ${id} bị trùng tên.`;
+          names.add(nameKey);
         }
       }
     }

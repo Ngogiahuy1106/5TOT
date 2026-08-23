@@ -11,7 +11,7 @@ HTML + Vanilla JS  →  REST API  →  Express  →  Prisma  →  PostgreSQL (Su
 ```
 
 - `Submission`: 1 dòng = 1 hồ sơ sinh viên đã bấm "Gửi cho Ban PTSV5T SEEE" (kèm toàn
-  bộ dữ liệu form dạng JSON + metadata ảnh minh chứng trong DB; file ảnh thật nằm trong Supabase Storage Bucket -
+  bộ dữ liệu form dạng JSON + metadata ảnh minh chứng trong DB; file ảnh thật nằm trong Cloudflare R2 bucket -
   không lưu base64 trong PostgreSQL).
 - `AppConfig`: link mẫu đơn, thời gian nhận hồ sơ, năm báo cáo và danh mục hoạt động Excel; quản trị được trực tiếp trên web.
 - `AdminReviewer`: danh sách chuẩn tên thành viên Ban; mỗi lần kiểm tra chỉ được chọn từ dropdown này.
@@ -60,7 +60,7 @@ quan tâm lịch sử migration - phù hợp lúc mới thiết lập).
    giờ có server Node thật).
 3. **Build Command**: `npm install && npx prisma migrate deploy`
    **Start Command**: `npm start`
-4. Environment cần đủ 6 biến: `ADMIN_PASSWORD`, `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`
+4. Environment cần đủ 7 biến: `ADMIN_PASSWORD`, `DATABASE_URL`, `DIRECT_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
    (copy từ `.env.example`, điền giá trị thật từ Supabase Project Settings ->
    Database -> Connection string).
 
@@ -79,7 +79,7 @@ trước khi dán vào 2 dòng trên (VD: `@` -> `%40`).
 ## Luồng "Lưu" vs "Gửi cho Ban PTSV5T SEEE" (không đổi so với bản trước)
 
 - **Lưu (trên máy này)**: dữ liệu form nhẹ lưu trong `localStorage`, ảnh bản nháp lưu bằng IndexedDB; không gửi lên server/Bucket.
-- **Gửi cho Ban PTSV5T SEEE**: gửi dữ liệu hồ sơ lên `POST /api/submissions`; server upload ảnh vào Supabase Storage Bucket, còn Prisma chỉ ghi metadata ảnh vào Postgres. Ban PTSV5T SEEE xem lại ngay trong màn quản trị sau khi đăng nhập session.
+- **Gửi cho Ban PTSV5T SEEE**: gửi dữ liệu hồ sơ lên `POST /api/submissions`; server upload ảnh vào Cloudflare R2, còn Prisma chỉ ghi metadata ảnh vào Postgres (Supabase). Ban PTSV5T SEEE xem lại ngay trong màn quản trị sau khi đăng nhập session.
 
 ## Kiểm tra nhanh sau khi deploy
 
@@ -151,25 +151,34 @@ npm test
 ```
 
 
-## Supabase Storage Bucket
+## Cloudflare R2 bucket
 
-Tạo bucket thủ công trong **Supabase Dashboard → Storage → New bucket** trước khi chạy server:
+Postgres vẫn dùng Supabase; riêng kho ảnh minh chứng chạy trên Cloudflare R2
+(10 GB miễn phí, egress không tính phí). Tạo bucket thủ công trong
+**Cloudflare Dashboard → Storage & databases → R2 → Create bucket** trước khi chạy server:
 
-- Tên bucket phải đúng bằng `SUPABASE_STORAGE_BUCKET` (mặc định: `sv5tot-evidence`).
-- Chọn **Private bucket**.
-- Có thể để trống `Allowed MIME types`; backend đã chỉ chấp nhận `image/jpeg`, `image/png`, `image/webp`.
-- Nếu muốn giới hạn MIME trên Supabase, thêm từng MIME thành từng mục riêng, không dán nhiều loại vào cùng một ô.
-- File size limit nên đặt 8 MB hoặc 10 MB.
+- Tên bucket phải đúng bằng `R2_BUCKET` (mặc định: `sv5tot-evidence`).
+- Location chọn **Asia-Pacific (APAC)** cho gần người dùng trong nước.
+- **Không** bật Public access: ảnh chỉ mở qua presigned URL 15 phút do server ký.
+- Không cần đặt giới hạn MIME hay dung lượng trên R2; backend đã chỉ chấp nhận
+  `image/jpeg`, `image/png`, `image/webp` và tối đa 8 MB mỗi ảnh.
 
-Thêm ba biến môi trường:
+Tạo API token tại **R2 → API → Manage API tokens → Create Account API token**,
+quyền **Object Read & Write**, giới hạn đúng bucket trên. Rồi thêm bốn biến môi trường:
 
 ```env
-SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
-SUPABASE_STORAGE_BUCKET="sv5tot-evidence"
+R2_ACCOUNT_ID="YOUR_ACCOUNT_ID"
+R2_ACCESS_KEY_ID="YOUR_ACCESS_KEY_ID"
+R2_SECRET_ACCESS_KEY="YOUR_SECRET_ACCESS_KEY"
+R2_BUCKET="sv5tot-evidence"
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` chỉ được đặt ở server/Render, tuyệt đối không đưa vào JavaScript phía trình duyệt hoặc commit lên GitHub.
+`R2_SECRET_ACCESS_KEY` chỉ được đặt ở server/Render, tuyệt đối không đưa vào JavaScript phía trình duyệt hoặc commit lên GitHub.
+
+Server ký mọi request lên R2 bằng AWS Signature V4 tự cài trong `server.js`
+(không thêm dependency). Link xem ảnh được ký cục bộ nên không tốn request mạng
+hay operation nào của R2. Phần ký được khóa lại bằng `test/r2-sigv4.test.js`,
+đối chiếu với bộ test vector chính thức của AWS.
 
 Server **không tự tạo bucket**. Server vẫn khởi động để Render không crash-loop khi Storage gián đoạn, tự kiểm tra lại mỗi 5 phút và trả trạng thái qua `/api/health`; trong lúc Storage chưa sẵn sàng, gửi hồ sơ được trả 503 rõ ràng còn dữ liệu cũ không bị sửa. Ảnh được sắp xếp theo cấu trúc:
 
