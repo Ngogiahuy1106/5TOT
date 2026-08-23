@@ -8,6 +8,8 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "check:r2": "node scripts/check-r2.js",
+    "migrate:r2": "node scripts/migrate-supabase-to-r2.js",
+    "inspect:db": "node scripts/inspect-db.js",
     "postinstall": "prisma generate"
   },
   "engines": {
