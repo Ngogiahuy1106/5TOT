@@ -701,8 +701,8 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
   text-align:center;
 }
 .tn-card{border:1px solid var(--border);border-radius:6px;background:var(--card);padding:11px 13px;font-size:13px}
-/* Chưa liệt kê ngày thì chưa gửi được hồ sơ - đánh dấu bằng vạch vàng bên trái. */
-.tn-card-incomplete{border-color:#e0c77d;box-shadow:inset 3px 0 0 #d9a93c}
+/* Thẻ thiếu ngày không tô viền riêng: dòng "Chưa có ngày nào - bắt buộc điền
+   trước khi gửi hồ sơ" ngay trong thẻ đã đủ báo, khỏi thêm vạch màu. */
 .tn-card-head{display:flex;align-items:flex-start;gap:10px}
 .tn-card-order{
   flex:0 0 auto;

@@ -986,7 +986,7 @@ function renderVolunteerCard(host, item, index, onChange){
   const noLongerOfficial = !item.proposed && !official;
 
   const card = document.createElement("div");
-  card.className = "tn-card" + (volunteerDatesOf(item).length ? "" : " tn-card-incomplete");
+  card.className = "tn-card";
 
   const head = document.createElement("div");
   head.className = "tn-card-head";
