@@ -675,39 +675,10 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
    nên cần bộ style riêng. Màu, bo góc và cỡ chữ lấy đúng token chung để không
    lệch tông; vàng cảnh báo dùng lại đúng bộ của .volunteer-pending-box. */
 
-/* Hai cách thêm hoạt động: chọn từ danh mục / tự nhập */
-.tn-add-panel{
-  display:grid;
-  grid-template-columns:1fr auto 1fr;
-  gap:16px;
-  background:#f7f9fb;
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:14px 16px;
-  margin-bottom:18px;
-}
-.tn-add-block{min-width:0}
-.tn-add-divider{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)}
-.tn-add-divider::before,
-.tn-add-divider::after{content:"";flex:1;width:1px;min-height:10px;background:var(--border)}
-.tn-add-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.tn-add-row select,
-.tn-add-row input[type=text]{flex:1;min-width:160px}
-.tn-add-row button{
-  flex:0 0 auto;
-  padding:9px 16px;
-  border:none;
-  border-radius:6px;
-  background:var(--navy);
-  color:#fff;
-  font:inherit;
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-}
-.tn-add-row button:hover:not(:disabled){background:var(--navy-dark)}
-.tn-add-row button:disabled{background:#aab6c2;cursor:not-allowed}
-.tn-add-note{margin-top:6px;font-size:12px;color:var(--text-muted)}
+/* Hai cách thêm hoạt động xếp dọc, mỗi dòng một việc - dùng chung .add-picker
+   và .freeform-row với các bước khác để độ rộng, màu nút và khoảng cách khớp nhau. */
+.tn-add-label{margin-bottom:6px}
+.tn-add-note{margin:-2px 0 18px;font-size:12px;color:var(--text-muted)}
 .tn-field-label{margin-bottom:6px;font-size:13px;font-weight:600;color:var(--navy-dark)}
 
 /* Tiến độ số ngày */
@@ -804,16 +775,11 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 .tn-btn-add-date:hover{background:#eef3f8}
 
 @media(max-width:720px){
-  .tn-add-panel{grid-template-columns:1fr;gap:12px}
-  .tn-add-divider{flex-direction:row}
-  .tn-add-divider::before,
-  .tn-add-divider::after{width:auto;height:1px;min-height:0;align-self:center}
   .tn-card-body{grid-template-columns:1fr}
 }
 
 /* Ban xem lại hồ sơ: ẩn mọi nút chỉnh sửa của bước này. Trước đây chỉ nút xóa
    mốc ngày được ẩn, còn "+ Thêm", "Xóa" và "+ Thêm ngày" vẫn bấm được. */
-body.admin-review-mode #stepContent .tn-add-row button,
 body.admin-review-mode #stepContent .tn-card-remove,
 body.admin-review-mode #stepContent .tn-btn-add-date,
 body.admin-review-mode #stepContent .tn-chip-remove{display:none!important}

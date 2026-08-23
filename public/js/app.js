@@ -1076,21 +1076,14 @@ function renderTinhNguyen(){
       <h2>Tình nguyện</h2>
       <p class="sub">Cần tổng cộng ít nhất <b>${VOLUNTEER_REQUIRED_DAYS} ngày</b> tình nguyện. Với mỗi hoạt động, ghi số ngày quy đổi và liệt kê đầy đủ các ngày đã tham gia - báo cáo sẽ in đúng theo danh sách này.</p>
 
-      <div class="tn-add-panel">
-        <div class="tn-add-block">
-          <div class="tn-field-label">Chọn từ danh mục của Ban</div>
-          <div class="tn-add-row" id="tnPicker"></div>
-        </div>
-        <div class="tn-add-divider"><span>hoặc</span></div>
-        <div class="tn-add-block">
-          <div class="tn-field-label">Tự nhập hoạt động chưa có trong danh mục</div>
-          <div class="tn-add-row">
-            <input type="text" id="tnCustomText" maxlength="500" placeholder="VD: Hỗ trợ đại hội chi đoàn - chi hội trường Điện - Điện tử">
-            <button type="button" id="tnCustomAdd">+ Thêm</button>
-          </div>
-          <div class="tn-add-note">Hoạt động tự nhập vẫn được tính; Ban sẽ đối chiếu khi duyệt minh chứng.</div>
-        </div>
+      <div class="field tn-add-label"><label style="font-weight:500">Chọn hoạt động từ danh mục của Ban</label></div>
+      <div class="add-picker" id="tnPicker"></div>
+      <div class="field tn-add-label"><label style="font-weight:500">Hoặc tự nhập hoạt động chưa có trong danh mục</label></div>
+      <div class="freeform-row">
+        <input type="text" id="tnCustomText" maxlength="500" placeholder="VD: Hỗ trợ đại hội chi đoàn - chi hội trường Điện - Điện tử">
+        <button type="button" id="tnCustomAdd">+ Thêm</button>
       </div>
+      <div class="tn-add-note">Hoạt động tự nhập vẫn được tính; Ban sẽ đối chiếu khi duyệt minh chứng.</div>
 
       <div id="tnSummary" class="tn-summary"></div>
       <div id="tnCards" class="tn-cards"></div>
