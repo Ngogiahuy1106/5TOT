@@ -999,7 +999,8 @@ function renderVolunteerCard(host, item, index, onChange){
   title.className = "tn-card-title";
   title.textContent = item.text;
   const badge = document.createElement("span");
-  badge.className = "tn-badge " + (item.proposed ? "tn-badge-custom" : "tn-badge-catalog");
+  // Cùng huy hiệu chính/phụ với danh sách hoạt động của các bước khác.
+  badge.className = "badge " + (item.proposed ? "phu" : "chinh");
   badge.textContent = item.proposed ? "Tự nhập" : "Từ danh mục của Ban";
   titleWrap.append(title, badge);
   const remove = document.createElement("button");
@@ -1161,7 +1162,8 @@ function renderTinhNguyen(){
     const strong = document.createElement("strong");
     strong.textContent = `${total} / ${VOLUNTEER_REQUIRED_DAYS} ngày`;
     const status = document.createElement("span");
-    status.className = reached ? "tn-summary-ok" : "tn-summary-warn";
+    // Dùng lại đúng chip điều kiện của các bước khác thay vì chip riêng.
+    status.className = reached ? "req-chip met" : "req-chip";
     status.textContent = reached ? "Đã đủ số ngày tối thiểu" : `Còn thiếu ${missing} ngày`;
     row.append(strong, status);
     const bar = document.createElement("div");

@@ -261,17 +261,19 @@
     font-size:13px;
     background:#fff;
   }
-  .item-list li .badge{
-    flex-shrink:0;
+  .badge{
+    display:inline-block;
     font-size:11px;
     font-weight:700;
     padding:2px 7px;
     border-radius:10px;
   }
+  .item-list li .badge{flex-shrink:0;}
   .badge.chinh{background:#e3ecff;color:#2545ac;}
   .badge.phu{background:#fdf0dd;color:#a3660b;}
   .item-list li .txt{flex:1;}
-  .item-list li button{
+  .item-list li button,
+  .tn-card-remove{
     background:none;
     border:none;
     color:var(--err);
@@ -680,20 +682,20 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
   gap:16px;
   background:#f7f9fb;
   border:1px solid var(--border);
-  border-radius:9px;
-  padding:16px 18px;
+  border-radius:8px;
+  padding:14px 16px;
   margin-bottom:18px;
 }
 .tn-add-block{min-width:0}
 .tn-add-divider{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)}
 .tn-add-divider::before,
 .tn-add-divider::after{content:"";flex:1;width:1px;min-height:10px;background:var(--border)}
-.tn-add-row{display:flex;align-items:center;gap:8px}
+.tn-add-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tn-add-row select,
-.tn-add-row input[type=text]{flex:1;min-width:0}
+.tn-add-row input[type=text]{flex:1;min-width:160px}
 .tn-add-row button{
   flex:0 0 auto;
-  padding:9px 15px;
+  padding:9px 16px;
   border:none;
   border-radius:6px;
   background:var(--navy);
@@ -712,10 +714,6 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 .tn-summary{margin-bottom:14px}
 .tn-summary-row{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:7px}
 .tn-summary-row strong{font-size:16px;color:var(--navy-dark);font-variant-numeric:tabular-nums}
-.tn-summary-ok,
-.tn-summary-warn{padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600}
-.tn-summary-ok{color:var(--ok);background:var(--ok-bg)}
-.tn-summary-warn{color:#8a6d1a;background:#fff8df}
 .tn-progress{height:7px;border-radius:999px;background:#e5eaf0;overflow:hidden}
 .tn-progress-fill{height:100%;border-radius:999px;background:var(--navy);transition:width .18s ease}
 .tn-progress-done{background:var(--ok)}
@@ -725,13 +723,13 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 .tn-empty{
   padding:16px;
   border:1px dashed var(--border);
-  border-radius:9px;
+  border-radius:6px;
   background:#fafbfc;
   font-size:13px;
   color:var(--text-muted);
   text-align:center;
 }
-.tn-card{border:1px solid var(--border);border-radius:9px;background:var(--card);padding:13px 15px}
+.tn-card{border:1px solid var(--border);border-radius:6px;background:var(--card);padding:11px 13px;font-size:13px}
 /* Chưa liệt kê ngày thì chưa gửi được hồ sơ - đánh dấu bằng vạch vàng bên trái. */
 .tn-card-incomplete{border-color:#e0c77d;box-shadow:inset 3px 0 0 #d9a93c}
 .tn-card-head{display:flex;align-items:flex-start;gap:10px}
@@ -747,22 +745,7 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 }
 .tn-card-title-wrap{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .tn-card-title{font-size:14px;font-weight:600;color:var(--navy-dark);overflow-wrap:anywhere}
-.tn-badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
-.tn-badge-catalog{color:var(--navy);background:#e7eef6}
-.tn-badge-custom{color:#8a6d1a;background:#fff8df}
-.tn-card-remove{
-  flex:0 0 auto;
-  padding:5px 10px;
-  border:1px solid #e7b7b3;
-  border-radius:6px;
-  background:#fff;
-  color:var(--err);
-  font:inherit;
-  font-size:12px;
-  font-weight:600;
-  cursor:pointer;
-}
-.tn-card-remove:hover{background:var(--err-bg)}
+.tn-card-remove{flex:0 0 auto;font-weight:600}
 .tn-card-warning{
   margin-top:9px;
   padding:8px 10px;
