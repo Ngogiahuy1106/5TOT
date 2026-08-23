@@ -50,3 +50,14 @@ test('không thể duyệt khi còn flags',()=>{
   assert.equal(rules.reviewStatusAllowed('Đã duyệt',{}),true);
   assert.equal(rules.reviewStatusAllowed('Cần bổ sung',{'evidence:x':'Thiếu'}),true);
 });
+
+// Bốn mục dưới đây in ra báo cáo bằng đúng nội dung sinh viên tự điền. Nếu luật
+// dùng chung để 'yesno' thì giao diện (evaluateGroupState) chặn còn máy chủ lại
+// cho gửi - đúng kiểu lệch luật mà cả file này sinh ra để ngăn.
+test('mục chỉ in nội dung tự điền phải bắt buộc có detail ở cả hai phía',()=>{
+  for(const id of ['DD-G5','TL-G1','TL-G3','TL-G4']){
+    assert.equal(rules.groupStateComplete({yes:true,detail:''},id),false,`${id} bỏ trống phải là chưa khai xong`);
+    assert.equal(rules.groupStateComplete({yes:true,detail:'nội dung'},id),true,`${id} có nội dung phải là đã khai xong`);
+    assert.equal(rules.groupStateComplete({yes:false},id),true,`${id} khai không đạt vẫn là đã khai xong`);
+  }
+});

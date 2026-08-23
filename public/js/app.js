@@ -50,10 +50,10 @@ const GROUPS = {
   daoDuc: {
     list: [
       {id:"DD-G1", label:"Tham gia các cuộc thi, diễn đàn học thuật tìm hiểu về chủ nghĩa Mác - Lênin, tư tưởng Hồ Chí Minh.", type:"sheet", minCount:1, items:CRITERIA.daoDuc},
-      {id:"DD-G2", label:"Là đảng viên Đảng Cộng sản Việt Nam, đánh giá xếp loại đảng viên là hoàn thành tốt nhiệm vụ trở lên.", type:"manualRank", rankOptions:["Hoàn thành tốt nhiệm vụ","Hoàn thành xuất sắc nhiệm vụ"], reportTemplate:"Là đảng viên Đảng Cộng sản Việt Nam, đánh giá xếp loại đảng viên là {rank}."},
+      {id:"DD-G2", label:"Là đảng viên Đảng Cộng sản Việt Nam, đánh giá xếp loại đảng viên là hoàn thành tốt nhiệm vụ trở lên.", type:"manualRank", rankOptions:["Tốt","Xuất sắc"], reportTemplate:"Đảng viên hoàn thành {rank} nhiệm vụ."},
       {id:"DD-G3", label:"Đạt giấy chứng nhận hoàn thành lớp bồi dưỡng nhận thức về Đảng cho đối tượng đảng từ loại giỏi trở lên.", type:"manualRank", rankOptions:["Giỏi","Xuất sắc"], reportTemplate:"Đạt giấy chứng nhận hoàn thành lớp bồi dưỡng nhận thức về Đảng cho đối tượng đảng loại {rank}."},
       {id:"DD-G4", label:"Tham gia tích cực các cuộc thi về Đảng, Đoàn - Hội do cấp đại học trở lên tổ chức, phát động hoặc công nhận.", type:"sheet", minCount:1, items:CRITERIA.daoDucDangDoan},
-      {id:"DD-G5", label:"Là thanh niên tiêu biểu, thanh niên tiên tiến, gương người tốt, việc tốt, có hành động dũng cảm cứu người được ghi nhận, biểu dương.", type:"manualYesNo"}
+      {id:"DD-G5", label:"Là thanh niên tiêu biểu, thanh niên tiên tiến, gương người tốt, việc tốt, có hành động dũng cảm cứu người được ghi nhận, biểu dương.", type:"manualYesNo", reportTemplate:"Được ghi nhận, biểu dương về {detail}."}
     ]
   },
   hocTap: {
@@ -68,10 +68,10 @@ const GROUPS = {
   },
   theLuc: {
     list: [
-      {id:"TL-G1", label:'Tham gia các hoạt động sát hạch thể lực và đạt danh hiệu "Sinh viên khỏe", "Thanh niên khỏe" từ cấp đại học trở lên.', type:"manualYesNo"},
+      {id:"TL-G1", label:'Tham gia các hoạt động sát hạch thể lực và đạt danh hiệu "Sinh viên khỏe", "Thanh niên khỏe" từ cấp đại học trở lên.', type:"manualYesNo", plainDetail:true},
       {id:"TL-G2", label:"Tham gia ít nhất 02 hoạt động thể dục thể thao từ cấp đại học trở lên.", type:"sheet", minCount:2, items:CRITERIA.theLuc},
-      {id:"TL-G3", label:"Là thành viên đội tuyển thể thao cấp đại học trở lên.", type:"manualYesNo"},
-      {id:"TL-G4", label:"Là thành viên tích cực của 01 câu lạc bộ thể thao cấp đại học.", type:"manualYesNo"}
+      {id:"TL-G3", label:"Là thành viên đội tuyển thể thao cấp đại học trở lên.", type:"manualYesNo", plainDetail:true},
+      {id:"TL-G4", label:"Là thành viên tích cực của 01 câu lạc bộ thể thao cấp đại học.", type:"manualYesNo", plainDetail:true}
     ]
   },
   hoiNhap: {
@@ -172,7 +172,33 @@ function removeDiacritics(str){
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d").replace(/Đ/g, "D");
 }
-function lowerFirst(s){ return s ? s.charAt(0).toLowerCase()+s.slice(1) : s; }
+// Xếp loại của Đảng in hoa đúng như văn bản của Đảng (Giỏi, Xuất sắc), không hạ
+// chữ đầu nữa. Bản cũ lưu nguyên câu "Hoàn thành xuất sắc nhiệm vụ" trong khi mẫu
+// mới chỉ chèn mức xếp loại, nên quy đổi lại khi đọc để hồ sơ cũ không in lặp chữ.
+const LEGACY_RANK_ALIASES = {
+  "hoan thanh tot nhiem vu":"Tốt",
+  "hoan thanh xuat sac nhiem vu":"Xuất sắc"
+};
+function normalizeRankValue(rank){
+  const raw = String(rank || "").trim();
+  if(!raw) return "";
+  return LEGACY_RANK_ALIASES[removeDiacritics(raw).toLowerCase()] || raw;
+}
+
+// Câu in ra báo cáo cho nhóm Có/Không. Ưu tiên reportTemplate ({detail} là phần
+// sinh viên tự điền), rồi tới plainDetail (chỉ in đúng phần tự điền), cuối cùng
+// mới là câu tiêu chí gốc kèm chi tiết trong ngoặc.
+function manualYesNoLabel(g, gs, period){
+  const detail = String(gs.detail || "").trim();
+  if(g.reportTemplate && detail) return g.reportTemplate.replace("{detail}", detail);
+  if(g.plainDetail) return detail || g.label;
+  if(!detail) return g.label;
+  return `${g.label.replace(/\.$/, "")} (${detail})` + (period ? "." : "");
+}
+
+// Nhóm chỉ in phần tự điền thì bỏ trống coi như chưa khai, vì báo cáo sẽ không có
+// nội dung gì để in.
+function manualDetailRequired(g){ return Boolean(g.plainDetail || g.reportTemplate); }
 function newStableId(prefix){
   const token=globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return `${prefix}-${token}`;
@@ -494,7 +520,7 @@ function evaluateGroupState(groupDef, groupState){
     } else if(groupDef.type === "manualRank"){
       achieved = Boolean(gs.rank);
     } else {
-      achieved = groupDef.plainDetail ? Boolean(String(gs.detail || "").trim()) : true;
+      achieved = manualDetailRequired(groupDef) ? Boolean(String(gs.detail || "").trim()) : true;
     }
   }
   return {
@@ -644,6 +670,9 @@ function renderGroupCard(container, groupDef, groupState, onChange){
     const y=document.createElement("button"); y.type="button"; y.textContent="Đạt"; y.className=groupState.yes===true?"selected-yes":""; y.onclick=()=>{groupState.yes=true;onChange();};
     const n=document.createElement("button"); n.type="button"; n.textContent="Không đạt"; n.className=groupState.yes===false?"selected-no":""; n.onclick=()=>{groupState.yes=false;groupState.rank="";groupState.pending=false;onChange();};
     yn.append(y,n); wrap.appendChild(yn);
+    // Hồ sơ cũ lưu xếp loại theo cách ghi trước đây - quy đổi ngay khi hiện form để
+    // ô chọn không bị rỗng và báo cáo in đúng mức đã khai.
+    if(groupState.rank) groupState.rank = normalizeRankValue(groupState.rank);
     if(groupState.yes===true){ const f=document.createElement("div"); f.className="field"; f.innerHTML="<label>Xếp loại cụ thể</label>"; const sel=document.createElement("select"); sel.innerHTML='<option value="">Chọn xếp loại</option>'+groupDef.rankOptions.map(r=>`<option value="${escapeHtmlAttr(r)}" ${groupState.rank===r?"selected":""}>${escapeHtml(r)}</option>`).join(""); sel.onchange=()=>{groupState.rank=sel.value;onChange();}; f.appendChild(sel); wrap.appendChild(f); }
   } else {
     const yn=document.createElement("div"); yn.className="yesno";
@@ -1498,17 +1527,14 @@ function groupEvidenceItems(list, groupsState){
     } else if(g.type === "manualRank"){
       if(gs.yes === true && gs.rank){
         const tpl = g.reportTemplate || g.label;
-        items.push({ key:g.id, label: tpl.replace("{rank}", lowerFirst(gs.rank)), method: EVIDENCE_DEFAULT_RANK });
+        items.push({ key:g.id, label: tpl.replace("{rank}", normalizeRankValue(gs.rank)), method: EVIDENCE_DEFAULT_RANK });
       }
     } else if(g.type === "manualYesNo"){
       if(gs.yes === true){
         const isMember = /là thành viên|là đội tuyển/i.test(g.label);
-        const label = g.plainDetail
-          ? (gs.detail ? gs.detail : g.label)
-          : (gs.detail ? `${g.label.replace(/\.$/, "")} (${gs.detail})` : g.label);
         items.push({
           key: g.id,
-          label: label,
+          label: manualYesNoLabel(g, gs, false),
           method: isMember ? EVIDENCE_DEFAULT_MEMBER : EVIDENCE_DEFAULT_MANUAL
         });
       }
@@ -1772,7 +1798,7 @@ function countGroupDeclarations(groupDefs, groupStates){
       else result.declared++;
     } else {
       if(gs.yes === null || gs.yes === undefined) result.unanswered++;
-      else if(gs.yes === true && g.plainDetail && !String(gs.detail || "").trim()) result.unanswered++;
+      else if(gs.yes === true && manualDetailRequired(g) && !String(gs.detail || "").trim()) result.unanswered++;
       else result.declared++;
     }
   });
@@ -2085,17 +2111,11 @@ function pickedGroupItemNames(groupsDef, groupsState, sectionKey){
     } else if(g.type === "manualRank"){
       if(gs.yes === true && gs.rank){
         const tpl = g.reportTemplate || g.label;
-        entries.push(reviewLine(tpl.replace("{rank}", lowerFirst(gs.rank)),`evidence:${sectionKey}::${g.id}`));
+        entries.push(reviewLine(tpl.replace("{rank}", normalizeRankValue(gs.rank)),`evidence:${sectionKey}::${g.id}`));
       }
     } else {
       if(gs.yes === true){
-        if(g.plainDetail){
-          // Chỉ ghi đúng nội dung sinh viên tự điền, không lặp lại cả câu tiêu chí gốc
-          entries.push(reviewLine(gs.detail ? gs.detail : g.label,`evidence:${sectionKey}::${g.id}`));
-        } else {
-          const base = g.label.replace(/\.$/, "");
-          entries.push(reviewLine(gs.detail ? `${base} (${gs.detail}).` : g.label,`evidence:${sectionKey}::${g.id}`));
-        }
+        entries.push(reviewLine(manualYesNoLabel(g, gs, true),`evidence:${sectionKey}::${g.id}`));
       }
     }
   });

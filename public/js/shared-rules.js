@@ -17,11 +17,14 @@
 
   const GPA_THRESHOLDS=Object.freeze({thuong:2.8,canBoDoan:2.5,traoDoi:2.8});
   const GROUP_VALIDATION_RULES=Object.freeze({
-    'DD-G1':{kind:'list',min:1},'DD-G2':{kind:'rank'},'DD-G3':{kind:'rank'},'DD-G4':{kind:'list',min:1},'DD-G5':{kind:'yesno'},
+    // DD-G5 và ba mục Thể lực dưới đây in ra báo cáo bằng đúng nội dung sinh viên
+    // tự điền, nên bỏ trống là chưa khai xong - dùng 'detail' để client và server
+    // cùng một luật, tránh giao diện chặn còn máy chủ lại cho gửi.
+    'DD-G1':{kind:'list',min:1},'DD-G2':{kind:'rank'},'DD-G3':{kind:'rank'},'DD-G4':{kind:'list',min:1},'DD-G5':{kind:'detail'},
     // HT-G1 vừa chọn được từ danh mục Excel vừa tự ghi, nên dùng listOrDetail:
     // hồ sơ cũ chỉ có `detail` vẫn hợp lệ, hồ sơ mới dùng `items`.
     'HT-G1':{kind:'listOrDetail',min:1},'HT-G2':{kind:'listOrDetail',min:1},'HT-G3':{kind:'list',min:1},'HT-G4':{kind:'listOrDetail',min:1},'HT-G5':{kind:'listOrDetail',min:1},'HT-G6':{kind:'listOrDetail',min:1},
-    'TL-G1':{kind:'yesno'},'TL-G2':{kind:'list',min:2},'TL-G3':{kind:'yesno'},'TL-G4':{kind:'yesno'},
+    'TL-G1':{kind:'detail'},'TL-G2':{kind:'list',min:2},'TL-G3':{kind:'detail'},'TL-G4':{kind:'detail'},
     'HN-KHOA-HOC':{kind:'list',min:1},'HN-CAP-DAI-HOC':{kind:'list',min:1},
     'HN-G1':{kind:'list',min:1},'HN-G2':{kind:'list',min:1}
   });
