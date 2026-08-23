@@ -668,12 +668,169 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 .reviewer-missing-warning{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#fdecec;border:1px solid #f3c9c9}
 .reviewer-option-inactive{color:#9aa5b1}
 
-/* ---- Ngày tình nguyện ---- */
-.tn-date-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
-.tn-date-row input[type=date]{max-width:170px}
+/* ---- Bước Tình nguyện ---- */
+/* Bước này dựng toàn bộ DOM bằng JS thay vì dùng .card/.field như các bước khác
+   nên cần bộ style riêng. Màu, bo góc và cỡ chữ lấy đúng token chung để không
+   lệch tông; vàng cảnh báo dùng lại đúng bộ của .volunteer-pending-box. */
+
+/* Hai cách thêm hoạt động: chọn từ danh mục / tự nhập */
+.tn-add-panel{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:16px;
+  background:#f7f9fb;
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:16px 18px;
+  margin-bottom:18px;
+}
+.tn-add-block{min-width:0}
+.tn-add-divider{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)}
+.tn-add-divider::before,
+.tn-add-divider::after{content:"";flex:1;width:1px;min-height:10px;background:var(--border)}
+.tn-add-row{display:flex;align-items:center;gap:8px}
+.tn-add-row select,
+.tn-add-row input[type=text]{flex:1;min-width:0}
+.tn-add-row button{
+  flex:0 0 auto;
+  padding:9px 15px;
+  border:none;
+  border-radius:6px;
+  background:var(--navy);
+  color:#fff;
+  font:inherit;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+}
+.tn-add-row button:hover:not(:disabled){background:var(--navy-dark)}
+.tn-add-row button:disabled{background:#aab6c2;cursor:not-allowed}
+.tn-add-note{margin-top:6px;font-size:12px;color:var(--text-muted)}
+.tn-field-label{margin-bottom:6px;font-size:13px;font-weight:600;color:var(--navy-dark)}
+
+/* Tiến độ số ngày */
+.tn-summary{margin-bottom:14px}
+.tn-summary-row{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:7px}
+.tn-summary-row strong{font-size:16px;color:var(--navy-dark);font-variant-numeric:tabular-nums}
+.tn-summary-ok,
+.tn-summary-warn{padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600}
+.tn-summary-ok{color:var(--ok);background:var(--ok-bg)}
+.tn-summary-warn{color:#8a6d1a;background:#fff8df}
+.tn-progress{height:7px;border-radius:999px;background:#e5eaf0;overflow:hidden}
+.tn-progress-fill{height:100%;border-radius:999px;background:var(--navy);transition:width .18s ease}
+.tn-progress-done{background:var(--ok)}
+
+/* Danh sách hoạt động đã khai */
+.tn-cards{display:grid;gap:12px}
+.tn-empty{
+  padding:16px;
+  border:1px dashed var(--border);
+  border-radius:9px;
+  background:#fafbfc;
+  font-size:13px;
+  color:var(--text-muted);
+  text-align:center;
+}
+.tn-card{border:1px solid var(--border);border-radius:9px;background:var(--card);padding:13px 15px}
+/* Chưa liệt kê ngày thì chưa gửi được hồ sơ - đánh dấu bằng vạch vàng bên trái. */
+.tn-card-incomplete{border-color:#e0c77d;box-shadow:inset 3px 0 0 #d9a93c}
+.tn-card-head{display:flex;align-items:flex-start;gap:10px}
+.tn-card-order{
+  flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  width:22px;height:22px;
+  border-radius:50%;
+  background:var(--navy);
+  color:#fff;
+  font-size:12px;
+  font-weight:700;
+}
+.tn-card-title-wrap{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.tn-card-title{font-size:14px;font-weight:600;color:var(--navy-dark);overflow-wrap:anywhere}
+.tn-badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.tn-badge-catalog{color:var(--navy);background:#e7eef6}
+.tn-badge-custom{color:#8a6d1a;background:#fff8df}
+.tn-card-remove{
+  flex:0 0 auto;
+  padding:5px 10px;
+  border:1px solid #e7b7b3;
+  border-radius:6px;
+  background:#fff;
+  color:var(--err);
+  font:inherit;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.tn-card-remove:hover{background:var(--err-bg)}
+.tn-card-warning{
+  margin-top:9px;
+  padding:8px 10px;
+  border:1px solid #e0c77d;
+  border-radius:7px;
+  background:#fff8df;
+  font-size:12.5px;
+  color:#8a6d1a;
+}
+.tn-card-body{display:grid;grid-template-columns:150px 1fr;gap:14px;margin-top:12px}
+.tn-days-col,
+.tn-dates-col{min-width:0}
+.tn-days-input{width:100%}
+.tn-days-hint{margin-top:5px;font-size:12px;color:var(--text-muted)}
+.tn-card-preview{
+  display:flex;flex-wrap:wrap;gap:6px;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px dashed var(--border);
+  font-size:12.5px;
+}
+.tn-preview-label{font-weight:600;color:var(--text-muted)}
+.tn-preview-text{color:var(--text);overflow-wrap:anywhere}
+
+/* Các mốc ngày trong một hoạt động */
 .tn-date-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tn-date-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#eef3f8;border:1px solid #d8e0e8;font-size:13px;font-variant-numeric:tabular-nums}
-.tn-date-chip button{border:none;background:transparent;color:#8a97a5;cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
-.tn-date-chip button:hover{color:#b3261e}
-.tn-item-dates{display:block;margin-top:2px;font-size:13px;color:#42566a}
-body.admin-review-mode #stepContent .tn-date-chip button{display:none!important}
+.tn-date-chip button,
+.tn-chip-remove{border:none;background:transparent;color:#8a97a5;cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+.tn-date-chip button:hover,
+.tn-chip-remove:hover{color:#b3261e}
+.tn-date-empty{font-size:12.5px;color:#8a6d1a}
+.tn-date-add{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.tn-date-add input[type=date]{
+  max-width:170px;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#fff;
+  color:var(--text);
+  font-family:inherit;
+  font-size:13px;
+  font-weight:600;
+}
+.tn-btn-add-date{
+  padding:8px 12px;
+  border:1px solid var(--navy);
+  border-radius:6px;
+  background:#fff;
+  color:var(--navy);
+  font:inherit;
+  font-size:12.5px;
+  font-weight:600;
+  cursor:pointer;
+}
+.tn-btn-add-date:hover{background:#eef3f8}
+
+@media(max-width:720px){
+  .tn-add-panel{grid-template-columns:1fr;gap:12px}
+  .tn-add-divider{flex-direction:row}
+  .tn-add-divider::before,
+  .tn-add-divider::after{width:auto;height:1px;min-height:0;align-self:center}
+  .tn-card-body{grid-template-columns:1fr}
+}
+
+/* Ban xem lại hồ sơ: ẩn mọi nút chỉnh sửa của bước này. Trước đây chỉ nút xóa
+   mốc ngày được ẩn, còn "+ Thêm", "Xóa" và "+ Thêm ngày" vẫn bấm được. */
+body.admin-review-mode #stepContent .tn-add-row button,
+body.admin-review-mode #stepContent .tn-card-remove,
+body.admin-review-mode #stepContent .tn-btn-add-date,
+body.admin-review-mode #stepContent .tn-chip-remove{display:none!important}
