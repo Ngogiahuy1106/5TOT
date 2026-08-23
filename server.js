@@ -9,6 +9,7 @@ const SV5TRules = require('./public/js/shared-rules.js');
 
 const prisma = new PrismaClient();
 const app = express();
+app.disable('x-powered-by'); // không cần lộ framework cho người quét CVE
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ALLOWED_STATUSES = new Set(['Chưa kiểm tra', 'Đã duyệt', 'Cần bổ sung']);
@@ -159,6 +160,39 @@ const reviewLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'review',keyOf:req
 const submitLimit=rateLimit({windowMs:10*60_000,max:8,prefix:'submit',keyOf:studentKeyOf,label:'gửi hồ sơ'});
 const submitIpLimit=rateLimit({windowMs:10*60_000,max:120,prefix:'submit-ip',label:'gửi hồ sơ'});
 const lookupLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'lookup',keyOf:req=>`${clientIpHash(req)}:${studentKeyOf(req)}`,label:'tra cứu'});
+// Chống dò MSSV mà KHÔNG khóa oan ký túc xá.
+//
+// Hạn mức theo IP thuần không dùng được ở đây: cả một tòa ký túc ra Internet
+// bằng một IP NAT, ngày báo kết quả có thể hàng trăm sinh viên cùng tra.
+// Nhưng người tra hợp lệ và kẻ dò khác nhau ở một điểm rất rõ: sinh viên biết
+// MSSV của mình nên hầu như luôn nhận 200, còn kẻ quét dãy số nhận 404 gần như
+// mọi lượt (chỉ vài trăm MSSV có hồ sơ trong không gian ~230.000).
+//
+// Vì vậy chỉ đếm những MSSV KHÁC NHAU mà IP đó tra ra "không tìm thấy". Sinh
+// viên gõ nhầm một hai lần không sao; tra đi tra lại đúng MSSV của mình thì
+// không tốn thêm lượt nào. Kẻ dò thì chạm trần sau LOOKUP_MISS_MAX lượt.
+// Đánh đổi có ý thức: khi ngân sách cạn thì CẢ IP đó bị chặn, kể cả sinh viên
+// tra MSSV có thật. Không tránh được, vì phải biết MSSV có tồn tại hay không
+// mới phân biệt được - mà trả lời rồi thì đã lộ mất điều cần giấu.
+//
+// Bù lại, chỉ lượt "không tìm thấy" mới tốn ngân sách, nên một tòa ký túc toàn
+// sinh viên tra MSSV của chính mình gần như không bao giờ chạm trần. Ký túc chỉ
+// bị chặn khi có người trên đúng IP đó thật sự đang quét - và chỉ 15 phút.
+//
+// 25 lượt/15 phút hạ tốc độ quét từ ~230.000 MSSV trong 6,4 giờ xuống còn
+// khoảng 96 ngày cho một IP.
+const LOOKUP_MISS_WINDOW_MS=15*60_000;
+const LOOKUP_MISS_MAX=25;
+async function lookupMissBudgetExceeded(req){
+  const {count}=await touchRateLimit(`lookup-miss:${clientIpHash(req)}`,LOOKUP_MISS_WINDOW_MS,{peek:true});
+  return count>=LOOKUP_MISS_MAX;
+}
+async function recordLookupMiss(req,mssv){
+  // Chỉ tính khi đây là lần đầu IP này hỏi tới đúng MSSV đó trong cửa sổ hiện
+  // tại, để việc bấm lại nhiều lần không bị tính thành nhiều lượt dò.
+  const pair=await touchRateLimit(`lookup-miss-seen:${clientIpHash(req)}:${shortHash(mssv)}`,LOOKUP_MISS_WINDOW_MS);
+  if(pair.count===1) await touchRateLimit(`lookup-miss:${clientIpHash(req)}`,LOOKUP_MISS_WINDOW_MS);
+}
 const deleteConfirmLimit=rateLimit({windowMs:15*60_000,max:10,prefix:'delete-confirm',label:'xác nhận xóa'});
 app.use('/api',(req,res,next)=>{res.setHeader('Cache-Control','no-store, no-cache, must-revalidate, private');res.setHeader('Pragma','no-cache');next();});
 app.use(express.json({ limit: '25mb' }));
@@ -539,8 +573,11 @@ async function hydrateEvidenceImageUrls(evidenceImages) {
 
 function checkAdminPassword(password) {
   if(!ADMIN_PASSWORD || typeof password!=="string") return false;
-  const a=Buffer.from(password), b=Buffer.from(ADMIN_PASSWORD);
-  return a.length===b.length && crypto.timingSafeEqual(a,b);
+  // Băm cả hai vế về đúng 32 byte trước khi so, để phép so không đoản mạch ở
+  // bước kiểm tra độ dài và do đó không rò rỉ độ dài mật khẩu qua thời gian.
+  const a=crypto.createHash('sha256').update(String(password)).digest();
+  const b=crypto.createHash('sha256').update(String(ADMIN_PASSWORD)).digest();
+  return crypto.timingSafeEqual(a,b);
 }
 async function serializableTransaction(work,maxAttempts=3){
   for(let attempt=1;attempt<=maxAttempts;attempt++){
@@ -937,10 +974,27 @@ function validateSubmissionPayload(body) {
   return null;
 }
 
+// Cấu hình chỉ đổi khi Ban bấm lưu, nhưng endpoint này nằm trên đường tới màn
+// hình đầu tiên và mỗi lượt đi Supabase mất ~0,8 giây. Giữ lại trong bộ nhớ
+// tiến trình, xóa ngay khi có thay đổi, và vẫn đặt hạn ngắn phòng khi Render
+// chạy nhiều instance - instance này không biết instance kia vừa ghi gì.
+//
+// Cố ý KHÔNG cache getSubmissionWindow(): đó là cổng chặn nộp hồ sơ, đọc phải
+// dữ liệu cũ có thể cho nộp sau hạn. Chậm hơn một chút ở đúng chỗ cần chắc.
+const CONFIG_CACHE_TTL_MS=30_000;
+let configCache=null,configCachedAt=0;
+function invalidateConfigCache(){ configCache=null;configCachedAt=0; }
+async function readAppConfigRow(){
+  if(configCache&&Date.now()-configCachedAt<CONFIG_CACHE_TTL_MS) return configCache;
+  configCache=await prisma.appConfig.findUnique({ where: { key: 'main' } });
+  configCachedAt=Date.now();
+  return configCache;
+}
+
 app.get('/api/config', async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   try {
-    const row = await prisma.appConfig.findUnique({ where: { key: 'main' } });
+    const row = await readAppConfigRow();
     res.json({
       success: true,
       config: {
@@ -985,6 +1039,7 @@ app.patch('/api/config', requireAdmin, async (req, res) => {
       reportYear: Number.isInteger(Number(config.reportYear)) && Number(config.reportYear)>=2020 && Number(config.reportYear)<=2100 ? Number(config.reportYear) : 2025,
     };
     await prisma.appConfig.upsert({ where: { key: 'main' }, update: payload, create: { key: 'main', ...payload } });
+    invalidateConfigCache();
     res.json({ success: true });
   } catch (err) {
     console.error('[config] PATCH failed:', err.message);
@@ -1200,8 +1255,12 @@ app.get('/api/submission-status',lookupLimit,async (req,res)=>{
   const mssv=String(req.query.mssv||'').trim();
   if(!validStudentId(mssv)) return res.status(400).json({success:false,message:'MSSV không hợp lệ.'});
   try{
+    if(await lookupMissBudgetExceeded(req)) return res.status(429).json({success:false,code:'RATE_LIMITED',scope:'ratelimit',message:'Mạng bạn đang dùng vừa tra quá nhiều MSSV không có hồ sơ. Vui lòng chờ khoảng 15 phút rồi thử lại, hoặc đổi sang mạng khác (ví dụ 4G) nếu cần tra gấp.'});
     const row=await prisma.submission.findUnique({where:{mssv},select:{updatedAt:true,review:{select:{status:true,updatedAt:true}}}});
-    if(!row) return res.status(404).json({success:false,message:'Không tìm thấy hồ sơ với MSSV này.'});
+    if(!row){
+      await recordLookupMiss(req,mssv).catch(err=>console.error('[lookup] miss counter:',err.message));
+      return res.status(404).json({success:false,message:'Không tìm thấy hồ sơ với MSSV này.'});
+    }
     res.json({success:true,status:row.review?.status||'Chưa kiểm tra',updatedAt:row.review?.updatedAt||row.updatedAt});
   }catch(err){res.status(500).json({success:false,message:'Không tra cứu được hồ sơ.'});}
 });
@@ -1315,6 +1374,7 @@ app.put('/api/admin/activity-catalog',requireAdmin,async(req,res)=>{
   if(issues.length) return res.status(400).json({success:false,code:'CATALOG_INVALID_ROWS',message:`Có ${issues.length} hoạt động không hợp lệ nên danh mục chưa được lưu.`,issues});
   try{
     await prisma.appConfig.upsert({where:{key:'main'},update:{activityCatalog:clean},create:{key:'main',activityCatalog:clean}});
+    invalidateConfigCache();
     res.json({success:true});
   }catch(err){ console.error('[catalog] save failed:',err.message); res.status(503).json({success:false,code:'CATALOG_DB',scope:'database',message:'Không ghi được danh mục vào cơ sở dữ liệu. Danh mục cũ vẫn giữ nguyên; vui lòng thử lại sau ít phút.'}); }
 });
@@ -1334,12 +1394,17 @@ async function refreshStorageReadiness(){
 }
 const storageVerification=setInterval(()=>refreshStorageReadiness(),5*60_000);
 if(typeof storageVerification.unref==='function') storageVerification.unref();
-const httpServer=app.listen(PORT,()=>{
+// Chỉ mở cổng khi chạy trực tiếp `node server.js`. Khi bị require từ test, chỉ
+// xuất `app` ra để test tự dựng server trên cổng ngẫu nhiên - nhờ vậy ma trận
+// phân quyền kiểm được bằng request thật thay vì đọc mã nguồn dạng chuỗi.
+const httpServer=require.main===module?app.listen(PORT,()=>{
   console.log(`SV5T Ho So server running at http://localhost:${PORT}`);
   refreshStorageReadiness();
-});
+}):null;
+module.exports={app,prisma};
 async function shutdown(){
   clearInterval(storageVerification);clearInterval(storageCleanup);clearInterval(limiterCleanup);
+  if(!httpServer){await prisma.$disconnect();process.exit(0);return;}
   httpServer.close(async()=>{await prisma.$disconnect();process.exit(0);});
   setTimeout(()=>process.exit(1),10_000).unref();
 }

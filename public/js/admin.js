@@ -763,7 +763,7 @@ async function loadAdminDashboard(){
 }
 async function exportReviewExcel(){
   try{const res=await adminFetch('/api/submissions-export');const r=await res.json();if(!res.ok||!r.success)throw new Error(r.message||'Không xuất được dữ liệu.');
-    if(typeof XLSX==='undefined') throw new Error('Không tải được thư viện Excel.');
+    try{ await window.ensureXlsx(); }catch(e){ throw new Error('Không tải được thư viện Excel.'); }
     const rows=(r.submissions||[]).map(x=>({'Họ và tên':x.fullName,'MSSV':x.mssv,'Lớp':x.className,'GPA':x.gpa,'Số ngày tình nguyện':x.volunteerDays,'Chi tiết ngày tình nguyện':x.volunteerDetail||'','Trạng thái':x.status,'Người kiểm tra':x.reviewer||'','Nội dung bị đánh dấu':x.reviewIssues||'','Ghi chú của Ban':x.note,'Thời điểm Ban kiểm tra':x.checkedAt?new Date(x.checkedAt).toLocaleString('vi-VN'):'','Cập nhật hồ sơ':new Date(x.updatedAt).toLocaleString('vi-VN')}));
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Danh sách xét duyệt');XLSX.writeFile(wb,'danh_sach_xet_duyet_sv5t.xlsx');
   }catch(err){await appAlert(err.message,'Xuất Excel thất bại');}

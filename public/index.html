@@ -197,9 +197,9 @@
 
 </div>
 
-<!-- SheetJS có SRI; docx được lưu nội bộ để xuất Word không phụ thuộc CDN. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="vendor/docx-8.5.0.umd.js"></script>
+<!-- SheetJS (có SRI) và docx KHÔNG nạp sẵn: cộng lại gần 1MB mà chỉ dùng khi
+     bấm xuất Word hoặc dùng Excel ở khu quản trị. ensureLibrary() trong app.js
+     chèn thẻ script đúng lúc cần. -->
 
 <!-- Luật dùng chung cho cả frontend và backend -->
 <script src="js/shared-rules.js"></script>

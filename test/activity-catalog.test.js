@@ -5,7 +5,10 @@ const vm=require('node:vm');
 
 const source=fs.readFileSync(require.resolve('../public/js/app.js'),'utf8');
 const serverSource=fs.readFileSync(require.resolve('../server.js'),'utf8');
-const block=source.slice(source.indexOf('const ACTIVITY_CATALOG_KEYS'),source.indexOf('function exportCriteriaExcel'));
+// Mốc cắt dùng regex chứ không dùng chuỗi cứng: thêm `async` vào khai báo hàm
+// từng làm lệch mốc và kéo theo cả file test đỏ vì một chữ thừa ở cuối lát cắt.
+const EXPORT_EXCEL_AT=source.search(/(?:async\s+)?function exportCriteriaExcel/);
+const block=source.slice(source.indexOf('const ACTIVITY_CATALOG_KEYS'),EXPORT_EXCEL_AT);
 
 // Lấy danh sách nhóm thẳng từ app.js thay vì chép cứng, để test không lệch khi
 // thêm/bớt nhóm danh mục (lần trước thêm hocTapClb đã làm cả file test đỏ).

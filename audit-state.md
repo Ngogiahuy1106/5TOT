@@ -71,11 +71,33 @@ Nhờ đó phần lớn kết luận pha 2/4/5 lên được `Verified`, và pha
 | Không có secret trong bundle client | Pass `Verified` | Không thêm biến vào `public/` |
 | Luật dùng chung client/server | Pass `Verified` (16/16 ca khớp) | Không sửa `GROUP_VALIDATION_RULES` mà quên `evaluateGroupState` |
 
+## Đã khắc phục ngày 23/08/2026 (sau khi báo cáo trên được viết)
+
+| Finding | Trạng thái mới | Kiểm chứng |
+|---|---|---|
+| F-01 rate limit tra cứu | **Fixed and verified** | Đếm riêng số MSSV *khác nhau* tra ra "không tìm thấy" theo IP, 25 lượt/15 phút. Thử thật: 20 MSSV đầu trả 404, từ MSSV thứ 21 trả 429 |
+| F-02 không có test phân quyền | **Fixed and verified** | `test/authorization.test.js` phủ 12/12 route bằng request thật. Phép thử đột biến gỡ `requireAdmin` giờ làm **2 test đỏ** (trước là 0) |
+| F-05 ô nhập 14px | **Fixed and verified** | Đo lại ở 360px: mọi ô nhập là **16px** |
+| F-07 so sánh mật khẩu | **Fixed and verified** | Băm SHA-256 cả hai vế trước `timingSafeEqual`, không còn đoản mạch theo độ dài |
+| F-08 không có CI | **Fixed and verified** | `.github/workflows/ci.yml` chạy `npm ci`, `npm test`, `npm audit` |
+| F-09 tràn ngang bước 9 | **Fixed and verified** | `.preview-doc` có `overflow-x:auto`. Đo lại: `scrollWidth` 360 = viewport 360, trang hết trượt ngang |
+| F-10 ô nhập thiếu tên | **Fixed and verified** | `linkFieldLabels()` nối nhãn sau mỗi lần render + `aria-label` cho 5 ô ngoài khuôn `.field`. Còn thiếu: **21 → 0** |
+| F-11 `/api/config` chậm | **Mitigated** | Cache tiến trình TTL 30s + xoá khi ghi. Đo thật: **1185ms → 528ms**. Không cache `getSubmissionWindow()` vì đó là cổng chặn nộp hồ sơ |
+| F-12 tải sẵn 921KB | **Fixed and verified** | `ensureLibrary()` nạp docx/xlsx khi bấm nút. Đo lại: `window.docx` và `window.XLSX` đều **chưa nạp** lúc vào trang |
+| F-13 `X-Powered-By` | **Fixed and verified** | `app.disable('x-powered-by')`; `curl -sI` không còn header |
+| F-14 lệch luật client/server | **Fixed and verified** | 16/16 tổ hợp khớp, có test hồi quy |
+
+`npm test`: **61 pass / 0 fail** (từ 57).
+
+## Phát sinh trong lúc sửa
+
+- **Nút thắt hiệu năng mới lộ ra.** Sau khi cache config, `/api/config` còn ~528ms — phần còn lại là `globalApiLimit` ghi bộ đếm xuống Postgres trên **mọi** request `/api`. Đây giờ là chi phí lớn nhất mỗi lượt gọi. Chưa sửa: kho hạn mức cũng là lớp bảo mật, đổi sang bộ nhớ tiến trình cần cân nhắc riêng (nhiều instance sẽ đếm lệch).
+- **Lịch sử migration bị lệch.** Database ghi nhận `20260819000000_init` không có trong repo. Vì vậy migration của F-03 **không** đặt vào `prisma/migrations/` (có thể làm `prisma migrate deploy` báo drift và hỏng cả lần deploy), mà để ở `prisma/pending/` kèm hướng dẫn áp dụng tay.
+
 ## Việc tiếp theo, theo thứ tự
 
-1. **F-04b: phục hồi thử backup Supabase một lần — đang chặn phát hành.** (~1 giờ)
-2. F-01: tách bộ đếm rate limit tra cứu theo IP thuần — sửa vài dòng.
-3. F-02 + F-08: thêm test HTTP cho ma trận quyền, rồi bật CI chạy `npm ci && npm test`.
-4. F-09: bọc `.preview-doc` trong khung `overflow-x:auto`.
-5. F-05, F-10: cỡ chữ ô nhập 16px ở màn hình hẹp; gắn `for`/`id` cho 21 ô nhập.
-6. F-11: cache `/api/config` trong bộ nhớ tiến trình, xoá cache khi `PATCH /api/config`.
+1. **F-04b: phục hồi thử backup Supabase một lần — đang chặn phát hành.** (~1 giờ, chỉ chủ tài khoản làm được)
+2. **F-03:** áp dụng `prisma/pending/20260823000000_status_check_constraint.sql` bằng tay, sau khi kiểm `npx prisma migrate status`.
+3. Xem lại lịch sử migration lệch giữa repo và database.
+4. F-06: gom màu về bộ token, rút breakpoint xuống 3 mốc.
+5. Cân nhắc bộ đếm rate limit trong bộ nhớ để bỏ nốt ~528ms mỗi request.

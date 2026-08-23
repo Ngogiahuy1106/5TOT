@@ -321,6 +321,10 @@
     border:1px solid #999;
     padding:20px;
     background:#fff;
+    /* Bảng báo cáo rộng hơn màn hình điện thoại. Cho nó tự cuộn trong khung này,
+       nếu không nó đẩy cả tiêu đề và cụm nút Gửi hồ sơ trượt ngang theo. */
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .preview-doc table{
     width:100%;
@@ -783,3 +787,16 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 body.admin-review-mode #stepContent .tn-card-remove,
 body.admin-review-mode #stepContent .tn-btn-add-date,
 body.admin-review-mode #stepContent .tn-chip-remove{display:none!important}
+
+/* iOS Safari tự phóng to trang khi focus vào ô nhập có cỡ chữ dưới 16px. Đây là
+   ứng dụng toàn form và sinh viên chủ yếu điền trên điện thoại, nên ở khổ hẹp
+   phải đủ 16px. Desktop giữ 14px cho gọn. */
+@media(max-width:760px){
+  input[type=text],
+  input[type=number],
+  input[type=date],
+  input[type=tel],
+  input[type=email],
+  select,
+  textarea{font-size:16px}
+}

@@ -311,6 +311,24 @@ function renderSteps(){
   });
 }
 
+// Khuôn <div class="field"><label>Tên</label><input id="..."></div> dùng khắp nơi
+// nhưng <label> không có `for`, nên trình đọc màn hình đọc các ô này là "edit
+// text" trống và bấm vào nhãn cũng không nhảy được vào ô. Nối lại sau mỗi lần
+// render, thay vì sửa tay hàng chục chỗ trong template và vẫn sót về sau.
+let _autoLabelSeq = 0;
+function linkFieldLabels(root){
+  if(!root) return;
+  root.querySelectorAll(".field").forEach(field => {
+    const label = field.querySelector(":scope > label");
+    if(!label || label.htmlFor) return;
+    // Checkbox/radio đã được bọc trong chính <label> nên bỏ qua.
+    const control = field.querySelector("input:not([type=checkbox]):not([type=radio]), select, textarea");
+    if(!control || control.closest("label")) return;
+    if(!control.id) control.id = `auto-field-${++_autoLabelSeq}`;
+    label.htmlFor = control.id;
+  });
+}
+
 function render(){
   renderSteps();
   const key = STEPS[state.step].key;
@@ -323,6 +341,7 @@ function render(){
   else if(key === "khac") renderKhac();
   else if(key === "minhChung") renderMinhChung();
   else if(key === "preview") renderPreview();
+  linkFieldLabels(contentEl);
   window.scrollTo(0,0);
 }
 
@@ -1109,7 +1128,7 @@ function renderTinhNguyen(){
       <div class="add-picker" id="tnPicker"></div>
       <div class="field tn-add-label"><label style="font-weight:500">Hoặc tự nhập hoạt động chưa có trong danh mục</label></div>
       <div class="freeform-row">
-        <input type="text" id="tnCustomText" maxlength="500" placeholder="VD: Hỗ trợ đại hội chi đoàn - chi hội trường Điện - Điện tử">
+        <input type="text" id="tnCustomText" maxlength="500" aria-label="Tên hoạt động tình nguyện tự nhập" placeholder="VD: Hỗ trợ đại hội chi đoàn - chi hội trường Điện - Điện tử">
         <button type="button" id="tnCustomAdd">+ Thêm</button>
       </div>
       <div class="tn-add-note">Hoạt động tự nhập vẫn được tính; Ban sẽ đối chiếu khi duyệt minh chứng.</div>
@@ -1452,6 +1471,7 @@ function renderFreeform(container, itemsList, onChange, placeholder){
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = placeholder || "Nhập tên hoạt động / thành tích...";
+  input.setAttribute("aria-label", input.placeholder);
   const btn = document.createElement("button");
   btn.textContent = "+ Thêm";
   btn.onclick = () => {
@@ -2266,11 +2286,11 @@ function renderPreview(){
             <td class="center bold" style="width:34%;font-size:14.3px">XÁC NHẬN CỦA BAN THƯ KÝ HỘI SINH VIÊN ĐẠI HỌC</td>
             <td style="width:33%;font-size:14.3px" class="center">
               <i>Hà Nội, ngày</i>
-              <input type="text" id="rdDay" maxlength="2" value="${escapeHtmlAttr(state.reportDate.day)}" placeholder="...." style="width:32px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
+              <input type="text" id="rdDay" maxlength="2" aria-label="Ngày làm báo cáo" value="${escapeHtmlAttr(state.reportDate.day)}" placeholder="...." style="width:32px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
               <i>tháng</i>
-              <input type="text" id="rdMonth" maxlength="2" value="${escapeHtmlAttr(state.reportDate.month)}" placeholder="...." style="width:32px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
+              <input type="text" id="rdMonth" maxlength="2" aria-label="Tháng làm báo cáo" value="${escapeHtmlAttr(state.reportDate.month)}" placeholder="...." style="width:32px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
               <i>năm</i>
-              <input type="text" id="rdYear" maxlength="4" value="${escapeHtmlAttr(state.reportDate.year)}" style="width:48px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
+              <input type="text" id="rdYear" maxlength="4" aria-label="Năm làm báo cáo" value="${escapeHtmlAttr(state.reportDate.year)}" style="width:48px;text-align:center;font-family:inherit;font-size:inherit;font-style:italic;border:none;border-bottom:1px dotted #666">
               <br><b>NGƯỜI BÁO CÁO</b>
             </td>
           </tr>
@@ -2302,9 +2322,35 @@ function renderPreview(){
   });
 }
 
+/* ---------- Nạp thư viện nặng theo yêu cầu ----------
+   docx (725KB) chỉ dùng khi bấm "Tải file Word"; SheetJS chỉ dùng ở khu quản trị
+   và phần danh mục hoạt động. Nạp sẵn cả hai bắt mọi sinh viên tải gần 1MB chưa
+   chắc dùng tới, nên chèn thẻ script đúng lúc cần và nhớ lại promise để lần sau
+   không tải lại. */
+const _libraryPromises = {};
+function ensureLibrary(globalName, src, integrity){
+  if(window[globalName]) return Promise.resolve(window[globalName]);
+  if(_libraryPromises[src]) return _libraryPromises[src];
+  _libraryPromises[src] = new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = src;
+    if(integrity){ el.integrity = integrity; el.crossOrigin = "anonymous"; el.referrerPolicy = "no-referrer"; }
+    el.onload = () => window[globalName] ? resolve(window[globalName]) : reject(new Error(`Đã tải ${src} nhưng không thấy ${globalName}.`));
+    el.onerror = () => { delete _libraryPromises[src]; reject(new Error(`Không tải được ${src}.`)); };
+    document.head.appendChild(el);
+  });
+  return _libraryPromises[src];
+}
+const XLSX_SRC = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const XLSX_SRI = "sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==";
+function ensureXlsx(){ return ensureLibrary("XLSX", XLSX_SRC, XLSX_SRI); }
+function ensureDocx(){ return ensureLibrary("docx", "vendor/docx-8.5.0.umd.js"); }
+window.ensureXlsx = ensureXlsx;
+
 /* ---------- Xuất Word (.docx) - giữ khối tiêu đề + xác nhận của file gốc ---------- */
-function exportDocx(){
-  if(typeof docx === "undefined"){
+async function exportDocx(){
+  try{ await ensureDocx(); }
+  catch(err){
     appAlert("Không tải được thư viện tạo file Word (cần kết nối mạng). Vui lòng kiểm tra lại kết nối mạng rồi thử lại.","Không thể xuất Word");
     return;
   }
@@ -2834,8 +2880,9 @@ function parseActivityCatalogRows(rows){
   return {catalog:collected,sourceCount,mappedCount};
 }
 
-function exportCriteriaExcel(){
-  if(typeof XLSX === "undefined"){
+async function exportCriteriaExcel(){
+  try{ await ensureXlsx(); }
+  catch(err){
     appAlert("Không tải được thư viện Excel (cần kết nối mạng).","Không thể dùng Excel");
     return;
   }
@@ -2883,8 +2930,9 @@ function exportCriteriaExcel(){
 }
 
 let _activityCatalogImportRunning=false;
-function importCriteriaExcel(file){
-  if(typeof XLSX === "undefined"){
+async function importCriteriaExcel(file){
+  try{ await ensureXlsx(); }
+  catch(err){
     appAlertDetailed({
       title:"Không dùng được chức năng Excel",
       message:"Trình duyệt chưa tải được thư viện đọc file Excel (SheetJS).",
