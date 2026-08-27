@@ -1719,6 +1719,18 @@ function formatImageBytes(bytes){
   return value>=1024*1024?`${(value/1024/1024).toFixed(1)} MB`:`${Math.max(1,Math.round(value/1024))} KB`;
 }
 
+// Link đơn do sinh viên tự nhập. Chỉ dựng thẻ liên kết khi đúng là URL https:
+// giá trị dạng javascript:... không chứa dấu ngoặc nhọn nên lọt qua bộ lọc HTML,
+// và sẽ chạy ngay trên máy người đang chấm hồ sơ nếu họ bấm vào.
+function evidenceFormLinkHref(value){
+  const raw=String(value==null?"":value).trim();
+  if(!raw) return null;
+  try{
+    const url=new URL(raw);
+    return url.protocol==="https:"&&url.hostname ? url.href : null;
+  }catch{ return null; }
+}
+
 function renderImageSlot(container, evKey, slotLabel){
   const wrap = document.createElement("div");
   wrap.className = "evidence-img-slot";
@@ -2062,8 +2074,17 @@ function renderMinhChung(){
           const evKey = cardDef.key+"::"+it.key;
           const evStatus = normalizeEvidenceStatus(state.evidence[evKey]);
           const hasImage = hasEvidenceImageForItem(evKey, it.dualSlot);
+          // Backend tính "form + link https hợp lệ" là đã đủ minh chứng
+          // (computeServerReview), nên phần hiển thị phải nói đúng như vậy.
+          const formHref = evStatus === "form" ? evidenceFormLinkHref(state.evidenceForms[evKey]) : null;
+          const evidenceReady = hasImage || Boolean(formHref);
+          const statusText = hasImage ? "Đã đủ ảnh minh chứng"
+            : formHref ? "Đã có link đơn minh chứng"
+            : evStatus === "form" ? "Link đơn chưa hợp lệ"
+            : evStatus === "later" ? "Sẽ bổ sung sau"
+            : "Chưa đủ ảnh minh chứng";
           const row = document.createElement("div");
-          row.className = "evidence-item" + (hasImage ? " checked" : evStatus === "later" ? " pending" : "");
+          row.className = "evidence-item" + (evidenceReady ? " checked" : evStatus === "later" ? " pending" : "");
 
           const top = document.createElement("div");
           top.className = "evidence-item-main";
@@ -2071,7 +2092,7 @@ function renderMinhChung(){
             <div class="evidence-item-text">
               <div class="evidence-item-label">${escapeHtml(it.label)}</div>
               <div class="evidence-item-method">Minh chứng: ${escapeHtml(it.method)}</div>
-              <div class="evidence-auto-status ${hasImage ? "ready" : ""}">${hasImage ? "Đã đủ ảnh minh chứng" : "Chưa đủ ảnh minh chứng"}</div>
+              <div class="evidence-auto-status ${evidenceReady ? "ready" : ""}">${escapeHtml(statusText)}</div>
             </div>
             <div class="evidence-choice-box">
               <label><input type="checkbox" class="ev-later" ${evStatus === "later" ? "checked" : ""}> Bổ sung sau</label>
@@ -2083,10 +2104,35 @@ function renderMinhChung(){
           if(evStatus === "form"){
             const formWrap=document.createElement("div"); formWrap.className="evidence-form-url field";
             const label=document.createElement("label"); label.textContent="Link đơn minh chứng";
-            const input=document.createElement("input"); input.type="url"; input.placeholder="https://drive.google.com/..."; input.value=state.evidenceForms[evKey]||"";
-            const hint=document.createElement("div"); hint.className="hint"; hint.textContent="Hãy kiểm tra link ở cửa sổ ẩn danh trước khi gửi.";
-            input.addEventListener("input",e=>{state.evidenceForms[evKey]=e.target.value.trim();markStateDirty();});
-            formWrap.append(label,input,hint); row.appendChild(formWrap);
+            const saved=state.evidenceForms[evKey]||"";
+            formWrap.appendChild(label);
+            if(window._adminReviewSubmission){
+              // Ở chế độ quản trị mọi input bị khóa pointer-events, nên link nằm
+              // trong input thì vừa bị cắt ngắn vừa không bấm/bôi đen được.
+              const view=document.createElement("div"); view.className="evidence-form-view";
+              if(formHref){
+                const link=document.createElement("a");
+                link.href=formHref; link.target="_blank"; link.rel="noopener noreferrer";
+                link.textContent=formHref;
+                view.appendChild(link);
+              } else {
+                view.className+=" invalid";
+                view.textContent=saved?`Link không hợp lệ: ${saved}`:"Sinh viên chưa điền link đơn.";
+              }
+              formWrap.appendChild(view);
+            } else {
+              const input=document.createElement("input"); input.type="url"; input.placeholder="https://drive.google.com/..."; input.value=saved;
+              const open=document.createElement("a"); open.className="evidence-form-open"; open.target="_blank"; open.rel="noopener noreferrer"; open.textContent="Mở link trong tab mới";
+              const applyHref=value=>{
+                const href=evidenceFormLinkHref(value);
+                if(href){ open.href=href; open.hidden=false; } else { open.removeAttribute("href"); open.hidden=true; }
+              };
+              applyHref(saved);
+              input.addEventListener("input",e=>{const v=e.target.value.trim();state.evidenceForms[evKey]=v;applyHref(v);markStateDirty();});
+              const hint=document.createElement("div"); hint.className="hint"; hint.textContent="Hãy kiểm tra link ở cửa sổ ẩn danh trước khi gửi.";
+              formWrap.append(input,open,hint);
+            }
+            row.appendChild(formWrap);
           }
 
           const imgRow = document.createElement("div");

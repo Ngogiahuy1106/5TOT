@@ -647,6 +647,13 @@ body.admin-review-mode #submitSupabaseBtn,body.admin-review-mode #saveLocalBtn,b
 .dashboard-card{border:1px solid var(--border);border-radius:9px;padding:12px;background:#f7f9fb;}
 .dashboard-card span{display:block;font-size:12px;color:var(--text-muted);}.dashboard-card strong{font-size:24px;color:var(--navy-dark);}
 .evidence-form-url{margin:8px 8px 8px 26px;}.evidence-form-url input{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:6px;}
+.evidence-form-open{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:600;color:var(--navy);}
+.evidence-form-open[hidden]{display:none;}
+/* Chế độ quản trị hiển thị link dạng văn bản bấm được: input bị khóa
+   pointer-events nên vừa cắt mất đuôi link vừa không mở/bôi đen được. */
+.evidence-form-view{padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13px;line-height:1.55;word-break:break-all;}
+.evidence-form-view a{color:var(--navy);font-weight:600;}
+.evidence-form-view.invalid{background:var(--err-bg);border-color:#f0c4c0;color:var(--err);font-weight:600;}
 .lookup-status-box{border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;background:#f7f9fb;line-height:1.6;}
 @media(max-width:800px){.admin-dashboard{grid-template-columns:1fr 1fr;}.admin-toolbar{align-items:stretch;}.admin-toolbar>*{width:100%;}}
 .admin-check-help{padding:10px 12px;margin-bottom:12px;border-radius:7px;background:#eef4fa;color:var(--navy-dark);font-size:13px}.admin-check-targets{max-height:42vh;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px}.admin-check-section{padding:10px 12px;border-bottom:1px solid var(--border)}.admin-check-section:last-child{border-bottom:0}.admin-check-section h4{margin:0 0 7px;color:var(--navy)}.admin-check-item{display:flex;gap:9px;align-items:flex-start;padding:6px 0;font-size:13px}.admin-check-item input{margin-top:2px;width:16px;height:16px}.admin-review-red{color:#b3261e!important;font-weight:700!important;background:#fff1f0}.admin-review-banner .banner-actions{display:flex;gap:8px;flex-wrap:wrap}

@@ -958,7 +958,15 @@ function validateSubmissionPayload(body) {
   if(data.evidence!==undefined&&(!SV5TRules.isPlainObject(data.evidence)||Object.keys(data.evidence).length>200)) return 'Trạng thái minh chứng không hợp lệ.';
   if(data.evidenceForms!==undefined&&(!SV5TRules.isPlainObject(data.evidenceForms)||Object.keys(data.evidenceForms).length>200)) return 'Danh sách link đơn minh chứng không hợp lệ.';
   for(const value of Object.values(data.evidence||{})) if(!['','later','form'].includes(String(value||''))) return 'Có trạng thái minh chứng không được hỗ trợ.';
-  for(const value of Object.values(data.evidenceForms||{})) if(String(value||'').length>2000) return 'Link đơn minh chứng quá dài.';
+  for(const value of Object.values(data.evidenceForms||{})){
+    const link=String(value||'').trim();
+    if(!link) continue;
+    if(link.length>2000) return 'Link đơn minh chứng quá dài.';
+    // Chặn ngay ở cửa vào. Bộ lọc thẻ HTML không bắt được giá trị dạng
+    // javascript:... vì nó không có dấu ngoặc nhọn; nếu lọt vào DB rồi được
+    // dựng thành liên kết thì nó chạy trên máy người đang chấm hồ sơ.
+    if(!isValidPublicUrl(link)) return 'Link đơn minh chứng phải là địa chỉ https hợp lệ.';
+  }
   let totalEvidenceBytes=0;
   for(const [key,image] of Object.entries(evidenceImages||{})){
     if(!allowedImageKeys.has(key)) return `Ảnh minh chứng không thuộc hồ sơ hiện tại: ${String(key).slice(0,120)}.`;
