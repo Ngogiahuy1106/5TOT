@@ -269,8 +269,16 @@ function maybeOfferRestoreDraft(){
 
 function buildEvidenceImagesPayload(){
   const payload = {};
+  // Chỉ gửi ảnh còn thuộc hồ sơ hiện tại. Ảnh mồ côi (hoạt động đã bị xóa, nhóm
+  // chuyển sang "Không đạt"/"bổ sung sau") vẫn nằm trong state vì không có ô nào
+  // để người dùng gỡ; nếu gửi kèm, máy chủ trả "Ảnh minh chứng không thuộc hồ sơ
+  // hiện tại" và sinh viên kẹt cứng không tự thoát được.
+  // Không xóa khỏi state: thêm lại hoạt động thì ảnh cũ dùng được ngay. Ảnh cũ
+  // đã lưu trên kho cũng được server bỏ theo allowedKeys nên không cần dọn ở đây.
+  const allowed = currentEvidenceImageKeys();
   Object.entries(state.evidenceImages).forEach(([key, img]) => {
-    if(img?.dataUrl) payload[key] = {name:img.name || "anh.jpg", dataBase64:img.dataUrl};
+    if(!img?.dataUrl || !allowed.has(key)) return;
+    payload[key] = {name:img.name || "anh.jpg", dataBase64:img.dataUrl};
   });
   return payload;
 }

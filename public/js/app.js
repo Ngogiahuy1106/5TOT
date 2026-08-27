@@ -1530,6 +1530,11 @@ function groupEvidenceItems(list, groupsState){
   list.forEach(g => {
     const gs = groupsState[g.id];
     if(!gs) return;
+    // Cùng luật với backend (collectGroupEvidence trong server.js): nhóm chưa xác
+    // nhận "Đạt" hoặc đang để "bổ sung sau" thì không sinh minh chứng. Trước đây
+    // frontend vẫn hiện ô tải ảnh cho các nhóm này, nên sinh viên tải lên được
+    // những khóa mà máy chủ sẽ từ chối khi gửi hồ sơ.
+    if(gs.yes !== true || gs.pending === true) return;
     if(g.type === "sheet" || g.type === "manualList"){
       const picked = Array.isArray(gs.items) ? gs.items : [];
       // Hồ sơ/bản nháp cũ của nhóm nay đã chuyển sang dạng danh sách vẫn còn nội
@@ -1792,6 +1797,21 @@ function normalizeEvidenceStatus(value){
   if(value === true) return "ready";
   if(value === false || value == null) return "";
   return ["later","form"].includes(value) ? value : "";
+}
+
+// Đối xứng với currentExpectedImageKeys() trong server.js: đây là toàn bộ khóa
+// ảnh mà hồ sơ ở trạng thái hiện tại chấp nhận. Dùng để loại ảnh mồ côi khỏi
+// payload trước khi gửi (ví dụ sinh viên đã tải ảnh rồi xóa hoạt động đó đi).
+function currentEvidenceImageKeys(){
+  const keys=new Set();
+  EVIDENCE_CARDS.forEach(card=>{
+    card.getItems().forEach(it=>{
+      const key=card.key+"::"+it.key;
+      if(it.dualSlot){ keys.add(key+"::ky1"); keys.add(key+"::ky2"); }
+      else keys.add(key);
+    });
+  });
+  return keys;
 }
 
 function hasEvidenceImageForItem(evKey, dualSlot){
