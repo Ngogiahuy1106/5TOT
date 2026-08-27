@@ -1719,6 +1719,27 @@ function formatImageBytes(bytes){
   return value>=1024*1024?`${(value/1024/1024).toFixed(1)} MB`:`${Math.max(1,Math.round(value/1024))} KB`;
 }
 
+// Link xem ảnh của R2 chỉ sống 15 phút, còn phiên chấm hồ sơ kéo dài tới 8 giờ,
+// nên ảnh sẽ vỡ giữa chừng khi giao diện dựng lại thẻ <img> bằng link đã hết hạn.
+// Gặp ảnh vỡ thì xin lứa link mới, nhưng phải chặn vòng lặp: mỗi lứa link chỉ
+// được xin lại một lần, và tổng số lần xin có trần.
+const MAX_EVIDENCE_URL_REFRESH = 3;
+// Trần đếm số lần hỏng LIÊN TIẾP chứ không phải tổng số lần trong cả phiên chấm:
+// link sống 15 phút mà phiên chấm sống 8 giờ, nên hết hạn hàng chục lần là bình
+// thường. Chỉ khi hỏng dồn dập trong vài giây thì kho ảnh mới thật sự có vấn đề.
+const EVIDENCE_URL_REFRESH_RESET_MS = 60_000;
+function evidenceUrlRefreshDecision({adminMode,imageGeneration,currentGeneration,refreshCount,lastRefreshAt,now,maxRefresh,resetMs}){
+  if(!adminMode) return "skip-not-admin";
+  // Lứa link mới đã về; thẻ ảnh cũ vẫn kịp bắn lỗi nên bỏ qua để khỏi xin chồng.
+  if(imageGeneration !== currentGeneration) return "skip-stale";
+  const window_ = resetMs==null?EVIDENCE_URL_REFRESH_RESET_MS:resetMs;
+  const moc = Number(lastRefreshAt)||0;
+  const thoiDiem = Number(now)||Date.now();
+  const lienTiep = moc && (thoiDiem-moc)<=window_ ? (refreshCount||0) : 0;
+  if(lienTiep >= (maxRefresh==null?MAX_EVIDENCE_URL_REFRESH:maxRefresh)) return "skip-exhausted";
+  return "refresh";
+}
+
 // Link đơn do sinh viên tự nhập. Chỉ dựng thẻ liên kết khi đúng là URL https:
 // giá trị dạng javascript:... không chứa dấu ngoặc nhọn nên lọt qua bộ lọc HTML,
 // và sẽ chạy ngay trên máy người đang chấm hồ sơ nếu họ bấm vào.
@@ -1738,7 +1759,7 @@ function renderImageSlot(container, evKey, slotLabel){
 
   if(existing){
     wrap.innerHTML = `
-      <img src="${existing.dataUrl}" class="evidence-img-thumb" alt="minh chứng">
+      <img src="${escapeHtmlAttr(existing.dataUrl)}" class="evidence-img-thumb" alt="minh chứng">
       <div class="evidence-img-info">
         <div class="evidence-img-name">${escapeHtml(slotLabel ? slotLabel + ": " : "")}${escapeHtml(existing.name)}${existing.size?` · ${formatImageBytes(existing.size)}`:""}</div>
         <div class="evidence-img-actions">
@@ -1747,6 +1768,21 @@ function renderImageSlot(container, evKey, slotLabel){
         </div>
       </div>
     `;
+    const thumb = wrap.querySelector(".evidence-img-thumb");
+    if(thumb){
+      const generation = window._adminEvidenceUrlGeneration || 0;
+      thumb.addEventListener("error", () => {
+        const decision = evidenceUrlRefreshDecision({
+          adminMode: Boolean(window._adminReviewSubmission),
+          imageGeneration: generation,
+          currentGeneration: window._adminEvidenceUrlGeneration || 0,
+          refreshCount: window._adminEvidenceUrlRefreshCount || 0,
+          lastRefreshAt: window._adminEvidenceUrlLastRefreshAt || 0,
+          now: Date.now()
+        });
+        if(decision === "refresh" && typeof window.refreshAdminEvidenceImageUrls === "function") window.refreshAdminEvidenceImageUrls();
+      });
+    }
     wrap.querySelector(".evidence-img-preview").onclick = (e) => {
       e.preventDefault();
       openImagePreview(existing.dataUrl, existing.name || "Ảnh minh chứng");

@@ -588,6 +588,50 @@ async function updateSubmissionReview(item,row){
   setTimeout(() => { button.textContent = "Lưu"; button.disabled = false; },800);
 }
 
+function applyAdminEvidenceImages(evidenceImages){
+  if(!evidenceImages || typeof evidenceImages !== "object") return false;
+  state.evidenceImages = {};
+  Object.entries(evidenceImages).forEach(([key,img]) => {
+    state.evidenceImages[key] = {name:img.name || "Ảnh minh chứng",dataUrl:img.url || img.dataUrl || "",path:img.path || "",contentType:img.contentType || ""};
+  });
+  return true;
+}
+
+// Link xem ảnh của R2 hết hạn sau 15 phút, còn phiên chấm kéo dài 8 giờ. Thay vì
+// bắt người chấm quay ra danh sách rồi mở lại hồ sơ, xin thẳng lứa link mới.
+let _adminEvidenceUrlRefreshing = null;
+window._adminEvidenceUrlGeneration = 0;
+window._adminEvidenceUrlRefreshCount = 0;
+window._adminEvidenceUrlLastRefreshAt = 0;
+window.refreshAdminEvidenceImageUrls = function(){
+  const item = window._adminReviewSubmission;
+  if(!item?.id) return Promise.resolve(false);
+  if(_adminEvidenceUrlRefreshing) return _adminEvidenceUrlRefreshing;
+  const now = Date.now();
+  const truoc = window._adminEvidenceUrlLastRefreshAt || 0;
+  // Cách lần hỏng trước đủ lâu thì đây là một lần hết hạn bình thường, không
+  // phải kho ảnh đang hỏng: bắt đầu đếm lại từ đầu.
+  if(!truoc || now - truoc > EVIDENCE_URL_REFRESH_RESET_MS) window._adminEvidenceUrlRefreshCount = 0;
+  window._adminEvidenceUrlLastRefreshAt = now;
+  window._adminEvidenceUrlRefreshCount = (window._adminEvidenceUrlRefreshCount || 0) + 1;
+  _adminEvidenceUrlRefreshing = (async () => {
+    try{
+      const loaded = await callApi(`/api/submissions/${encodeURIComponent(item.id)}`,{},{admin:true});
+      if(!loaded.ok) return false;
+      if(!applyAdminEvidenceImages(loaded.body?.submission?.evidenceImages)) return false;
+      window._adminEvidenceUrlGeneration = (window._adminEvidenceUrlGeneration || 0) + 1;
+      // render() cuộn trang về đầu; giữ nguyên chỗ đang đọc để người chấm không
+      // bị nhảy lên đầu hồ sơ giữa chừng.
+      const scrollY = window.scrollY;
+      render();
+      window.scrollTo(0, scrollY);
+      return true;
+    }catch(err){ console.error("[admin] refresh anh minh chung:", err); return false; }
+    finally{ _adminEvidenceUrlRefreshing = null; }
+  })();
+  return _adminEvidenceUrlRefreshing;
+};
+
 async function reviewSubmission(item){
   const loaded = await callApi(`/api/submissions/${encodeURIComponent(item.id)}`,{},{admin:true});
   if(!loaded.ok){ await reportApiFailure(loaded,"Mở hồ sơ"); return; }
@@ -597,12 +641,10 @@ async function reviewSubmission(item){
     closeAdminSubmissionsPanel();
     captureAdminFormSnapshot();
     restoreStateDataOnly(full.data);
-    if(full.evidenceImages && typeof full.evidenceImages === "object"){
-      state.evidenceImages = {};
-      Object.entries(full.evidenceImages).forEach(([key,img]) => {
-        state.evidenceImages[key] = {name:img.name || "Ảnh minh chứng",dataUrl:img.url || img.dataUrl || "",path:img.path || "",contentType:img.contentType || ""};
-      });
-    }
+    applyAdminEvidenceImages(full.evidenceImages);
+    window._adminEvidenceUrlGeneration = 0;
+    window._adminEvidenceUrlRefreshCount = 0;
+    window._adminEvidenceUrlLastRefreshAt = 0;
     state.step = 0;
     window._adminReviewSubmission = full;
     window._adminReviewFlags = full.review?.flags || {};
