@@ -2339,7 +2339,7 @@ function renderPreview(){
         <div style="position:absolute; top:0; left:0; width:70px; height:91px; text-align:center; font-size:11px; font-weight:bold; padding-top:4px; border:1px solid #000; box-sizing:border-box; z-index:2">Ảnh 4x6</div>
         <table style="margin-bottom:10px">
           <tr>
-            <td style="width:60%;font-size:16.9px" class="center">HỘI SINH VIÊN VIỆT NAM THÀNH PHỐ HÀ NỘI<br><b>BCH ĐẠI HỌC BÁCH KHOA HÀ NỘI</b><br><b>***</b></td>
+            <td style="width:60%;font-size:16.9px" class="center">HỘI SINH VIÊN THÀNH PHỐ HÀ NỘI<br><b>BCH ĐH BÁCH KHOA HÀ NỘI</b><br><b>***</b></td>
             <td style="width:40%;font-size:18.2px" class="center"><b><u>HỘI SINH VIÊN VIỆT NAM</u></b></td>
           </tr>
         </table>
@@ -2567,8 +2567,8 @@ async function exportDocx(){
     anchor: { horizontal: FrameAnchorType.MARGIN, vertical: FrameAnchorType.MARGIN },
     wrap: FrameWrap.AROUND
   };
-  const orgLine1 = Ppar([T("HỘI SINH VIÊN VIỆT NAM THÀNH PHỐ HÀ NỘI", {size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
-  const orgLine2 = Ppar([T("BCH ĐẠI HỌC BÁCH KHOA HÀ NỘI", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
+  const orgLine1 = Ppar([T("HỘI SINH VIÊN THÀNH PHỐ HÀ NỘI", {size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
+  const orgLine2 = Ppar([T("BCH ĐH BÁCH KHOA HÀ NỘI", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
   const orgLine3 = Ppar([T("***", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
 
   const hsvFrameCfg = {
