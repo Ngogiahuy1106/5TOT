@@ -163,15 +163,12 @@ const reviewLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'review',keyOf:req
 const submitLimit=rateLimit({windowMs:10*60_000,max:8,prefix:'submit',keyOf:studentKeyOf,label:'gửi hồ sơ'});
 const submitIpLimit=rateLimit({windowMs:10*60_000,max:120,prefix:'submit-ip',label:'gửi hồ sơ'});
 const lookupLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'lookup',keyOf:req=>`${clientIpHash(req)}:${studentKeyOf(req)}`,label:'tra cứu'});
-// Chống dò MSSV mà không khóa oan ký túc xá. Hạn mức theo IP thuần không dùng
-// được vì cả tòa ký túc ra Internet bằng một IP NAT. Điểm khác nhau giữa sinh
-// viên và kẻ dò là kết quả tra: sinh viên biết MSSV của mình nên gần như luôn
-// nhận 200, kẻ quét dãy số nhận 404 gần như mọi lượt. Vì vậy chỉ đếm số MSSV
-// KHÁC NHAU mà một IP tra ra "không tìm thấy"; tra lại cùng một MSSV không tốn
-// thêm lượt. Đánh đổi: hết ngân sách thì cả IP bị chặn 15 phút, kể cả người tra
-// thật - không tránh được, vì muốn phân biệt thì phải trả lời MSSV có tồn tại
-// hay không, mà trả lời rồi là đã lộ. 25 lượt/15 phút kéo thời gian quét hết
-// ~230.000 MSSV từ 6,4 giờ lên khoảng 96 ngày cho mỗi IP.
+// Chống dò MSSV mà không khóa oan ký túc xá: cả tòa ra Internet bằng một IP NAT
+// nên hạn mức theo IP thuần sẽ chặn nhầm. Sinh viên tra MSSV của mình gần như
+// luôn nhận 200, kẻ quét dãy số nhận 404 gần như mọi lượt, nên chỉ đếm số MSSV
+// khác nhau mà một IP tra ra "không tìm thấy". Đánh đổi: hết ngân sách thì cả IP
+// bị chặn 15 phút. 25 lượt/15 phút kéo thời gian quét ~230.000 MSSV từ 6,4 giờ
+// lên khoảng 96 ngày.
 const LOOKUP_MISS_WINDOW_MS=15*60_000;
 const LOOKUP_MISS_MAX=25;
 async function lookupMissBudgetExceeded(req){

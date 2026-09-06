@@ -1,15 +1,8 @@
-// prisma/schema.prisma - sv5tot-hoso
-// ---------------------------------------------------------------------------
-// Submission: 1 dòng = 1 hồ sơ sinh viên đã bấm "Gửi cho Ban SV5T". `data` lưu
-// nguyên trạng thái form (JSON) để có thể tái tạo lại đúng bản đã gửi bất cứ
-// lúc nào (kể cả khi sau này đổi cấu trúc tiêu chí); `evidenceImages` chỉ lưu
-// metadata ảnh trong Cloudflare R2 (path, tên file, contentType). Ảnh thật không
-// còn được nhúng base64 vào PostgreSQL.
-//
-// AppConfig: 4 link mẫu đơn hiện ở bước "Minh chứng hoạt động", sửa được qua
-// mục Quản trị trên web (không cần đổi code/deploy lại). Mật khẩu quản trị
-// KHÔNG lưu ở đây - nằm trong biến môi trường ADMIN_PASSWORD, chỉ server biết.
-// ---------------------------------------------------------------------------
+// Submission: mỗi dòng là một hồ sơ đã gửi. `data` lưu nguyên trạng thái form
+// dạng JSON để tái tạo đúng bản đã gửi kể cả khi cấu trúc tiêu chí đổi về sau;
+// `evidenceImages` chỉ lưu metadata ảnh trên Cloudflare R2.
+// AppConfig: các link mẫu đơn và thời gian nhận hồ sơ, sửa được qua mục Quản
+// trị. Mật khẩu quản trị nằm ở biến môi trường ADMIN_PASSWORD, không ở database.
 
 datasource db {
   provider  = "postgresql"
