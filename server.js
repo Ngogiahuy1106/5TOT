@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const { PrismaClient, Prisma } = require('@prisma/client');
+const { createR2Signer } = require('./lib/r2-signing');
 const SV5TRules = require('./public/js/shared-rules.js');
 
 const prisma = new PrismaClient();
@@ -210,87 +211,21 @@ if(typeof limiterCleanup.unref==='function') limiterCleanup.unref();
 const storageCleanup=setInterval(()=>processStorageCleanupJobs().catch(err=>console.error('[storage] cleanup worker:',err.message)),60_000);
 if(typeof storageCleanup.unref==='function') storageCleanup.unref();
 
-// ---- Cloudflare R2 (S3-compatible, AWS Signature V4) ------------------------
-// R2 không có endpoint "sign" sẵn như Supabase Storage: mọi request phải tự ký
-// bằng SigV4. Bù lại, việc tạo link xem ảnh (presign) là phép tính cục bộ nên
-// không tốn round-trip mạng và không tính vào quota operation của R2.
+// ---- Cloudflare R2 (kho ảnh minh chứng) ------------------------------------
 function storageIsConfigured() {
   return Boolean(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET);
 }
 
-// RFC 3986: AWS chỉ để nguyên A-Z a-z 0-9 - _ . ~ ; encodeURIComponent bỏ sót ! ' ( ) *
-function uriEncode(value, encodeSlash = true) {
-  let out = encodeURIComponent(String(value)).replace(/[!'()*]/g, ch => '%' + ch.charCodeAt(0).toString(16).toUpperCase());
-  if (!encodeSlash) out = out.replace(/%2F/g, '/');
-  return out;
-}
-
-const sha256Hex = data => crypto.createHash('sha256').update(data).digest('hex');
-
-function amzTimestamps() {
-  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
-  return { amzDate, dateStamp: amzDate.slice(0, 8) };
-}
-
-function r2SigningKey(dateStamp) {
-  const hmac = (key, data) => crypto.createHmac('sha256', key).update(data).digest();
-  return hmac(hmac(hmac(hmac('AWS4' + R2_SECRET_ACCESS_KEY, dateStamp), R2_REGION), 's3'), 'aws4_request');
-}
-
-function canonicalQueryString(query) {
-  return Object.keys(query).sort().map(key => `${uriEncode(key)}=${uriEncode(query[key])}`).join('&');
-}
-
-// R2 dùng path-style: https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
-function r2CanonicalUri(objectPath) {
-  return `/${uriEncode(R2_BUCKET)}${objectPath ? `/${uriEncode(objectPath, false)}` : ''}`;
-}
-
-// Ký bằng Authorization header - dùng cho request đi từ server (PUT/DELETE/GET).
-function signR2Request({ method, objectPath = '', query = {}, headers = {}, body = null }) {
-  const { amzDate, dateStamp } = amzTimestamps();
-  const payloadHash = sha256Hex(body === null ? '' : body);
-  const table = {};
-  for (const [name, value] of Object.entries({ ...headers, host: R2_HOST, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate })) {
-    table[name.toLowerCase()] = String(value).trim().replace(/\s+/g, ' ');
-  }
-  const names = Object.keys(table).sort();
-  const canonicalHeaders = names.map(name => `${name}:${table[name]}\n`).join('');
-  const signedHeaders = names.join(';');
-  const canonicalQuery = canonicalQueryString(query);
-  const canonicalUri = r2CanonicalUri(objectPath);
-  const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders, payloadHash].join('\n');
-  const scope = `${dateStamp}/${R2_REGION}/s3/aws4_request`;
-  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
-  const signature = crypto.createHmac('sha256', r2SigningKey(dateStamp)).update(stringToSign).digest('hex');
-  return {
-    url: `https://${R2_HOST}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
-    headers: {
-      ...headers,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
-      Authorization: `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
-    },
-  };
-}
-
-// Ký vào query string - link tạm cho trình duyệt tải ảnh trực tiếp từ R2.
-function presignR2Get(objectPath, expiresIn) {
-  const { amzDate, dateStamp } = amzTimestamps();
-  const scope = `${dateStamp}/${R2_REGION}/s3/aws4_request`;
-  const canonicalQuery = canonicalQueryString({
-    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-    'X-Amz-Credential': `${R2_ACCESS_KEY_ID}/${scope}`,
-    'X-Amz-Date': amzDate,
-    'X-Amz-Expires': String(expiresIn),
-    'X-Amz-SignedHeaders': 'host',
-  });
-  const canonicalUri = r2CanonicalUri(objectPath);
-  const canonicalRequest = ['GET', canonicalUri, canonicalQuery, `host:${R2_HOST}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
-  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
-  const signature = crypto.createHmac('sha256', r2SigningKey(dateStamp)).update(stringToSign).digest('hex');
-  return `https://${R2_HOST}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
-}
+// Hai hàm bọc quanh lib/r2-signing.js, giữ nguyên cách gọi ở toàn bộ file này.
+const r2Signer = createR2Signer({
+  accountId: R2_ACCOUNT_ID,
+  accessKeyId: R2_ACCESS_KEY_ID,
+  secretAccessKey: R2_SECRET_ACCESS_KEY,
+  bucket: R2_BUCKET,
+  region: R2_REGION,
+});
+const signR2Request = options => r2Signer.signRequest(options);
+const presignR2Get = (objectPath, expiresIn) => r2Signer.presignGet(objectPath, expiresIn);
 
 async function storageFetch(url,options={},timeoutMs=15_000){
   const controller=new AbortController();

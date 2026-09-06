@@ -11,7 +11,7 @@ vm.runInContext(validationBlock+'\nglobalThis.audit={validateSubmissionPayload,c
 const imageBlock=source.slice(source.indexOf('const MAX_EVIDENCE_IMAGE_BYTES'),source.indexOf('function storageExtension'));
 const imageContext={Buffer,Set,Error,String};vm.createContext(imageContext);vm.runInContext(imageBlock+'\nglobalThis.parse=parseDataUrl;',imageContext);
 const appSource=fs.readFileSync(require.resolve('../public/js/app.js'),'utf8');
-const certBlock=appSource.slice(appSource.indexOf('const FOREIGN_CERTIFICATES'),appSource.indexOf('/* ---------- STEP: Hội nhập ---------- */'));
+const certBlock=appSource.slice(appSource.indexOf('const FOREIGN_CERTIFICATES'),appSource.indexOf('function renderHoiNhap('));
 const certContext={};vm.createContext(certContext);vm.runInContext(certBlock+'\nglobalThis.validateCert=validateNgoaiNguCertificate;',certContext);
 
 function groups(ids){return Object.fromEntries(ids.map(id=>[id,{yes:false,pending:false}]));}

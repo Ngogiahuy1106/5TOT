@@ -13,8 +13,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-const crypto = require('node:crypto');
+const { createR2Signer } = require('../lib/r2-signing');
 
 const ROOT = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(ROOT, '.env') });
@@ -26,24 +25,13 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || '';
 
-// Dùng lại đúng khối ký SigV4 trong server.js để không có bản sao thứ hai.
-const SRC = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-const sandbox = {
-  crypto,
-  R2_REGION: 'auto',
-  R2_HOST: `${(process.env.R2_ACCOUNT_ID || '').trim()}.r2.cloudflarestorage.com`,
-  R2_BUCKET: (process.env.R2_BUCKET || '').trim(),
-  R2_ACCESS_KEY_ID: (process.env.R2_ACCESS_KEY_ID || '').trim(),
-  R2_SECRET_ACCESS_KEY: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
-  exported: null,
-};
-vm.createContext(sandbox);
-vm.runInContext(
-  SRC.slice(SRC.indexOf('// RFC 3986:'), SRC.indexOf('function sanitizeFilePart(')) +
-    '\nexported = { signR2Request };',
-  sandbox,
-);
-const { signR2Request } = sandbox.exported;
+// Dùng chung lớp ký SigV4 với server.js qua lib/r2-signing.js.
+const { signRequest: signR2Request } = createR2Signer({
+  accountId: (process.env.R2_ACCOUNT_ID || '').trim(),
+  accessKeyId: (process.env.R2_ACCESS_KEY_ID || '').trim(),
+  secretAccessKey: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
+  bucket: (process.env.R2_BUCKET || '').trim(),
+});
 
 function thieuCauHinh() {
   const missing = [];

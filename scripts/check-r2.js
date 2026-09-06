@@ -8,7 +8,7 @@
 // Object test được tạo trong __smoke-test/ và xóa ngay sau đó.
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { createR2Signer } = require('../lib/r2-signing');
 const crypto = require('node:crypto');
 
 const ROOT = process.argv[2] || path.join(__dirname, '..');
@@ -18,22 +18,14 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split('\n'))
   if (m) process.env[m[1]] = m[2];
 }
 
-const SRC = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-const block = SRC.slice(SRC.indexOf('// RFC 3986:'), SRC.indexOf('function sanitizeFilePart('));
-
-const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
-const sandbox = {
-  crypto,
-  R2_REGION: 'auto',
-  R2_HOST: `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  R2_BUCKET: (process.env.R2_BUCKET || '').trim(),
-  R2_ACCESS_KEY_ID: (process.env.R2_ACCESS_KEY_ID || '').trim(),
-  R2_SECRET_ACCESS_KEY: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
-  exported: null,
-};
-vm.createContext(sandbox);
-new vm.Script(`${block}\nexported = { signR2Request, presignR2Get };`).runInContext(sandbox);
-const { signR2Request, presignR2Get } = sandbox.exported;
+// Dùng chung lớp ký SigV4 với server.js qua lib/r2-signing.js.
+const r2 = createR2Signer({
+  accountId: (process.env.R2_ACCOUNT_ID || '').trim(),
+  accessKeyId: (process.env.R2_ACCESS_KEY_ID || '').trim(),
+  secretAccessKey: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
+  bucket: (process.env.R2_BUCKET || '').trim(),
+});
+const { signRequest: signR2Request, presignGet: presignR2Get } = r2;
 
 const key = `__smoke-test/${crypto.randomUUID()}.txt`;
 const payload = Buffer.from('sv5tot r2 smoke test ' + new Date().toISOString(), 'utf8');
@@ -70,7 +62,7 @@ function step(name, ok, detail) {
     String(r.headers.get('content-type')));
 
   // 4. Link không có chữ ký phải bị từ chối
-  r = await fetch(`https://${sandbox.R2_HOST}/${sandbox.R2_BUCKET}/${key}`);
+  r = await fetch(`https://${r2.host}/${r2.bucket}/${key}`);
   // R2 trả 400 InvalidArgument (không phải 401/403) khi thiếu chữ ký - miễn là
   // không phải 2xx thì object không bị phục vụ công khai.
   step('Truy cap khong chu ky bi tu choi (bucket that su private)',
