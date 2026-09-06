@@ -876,6 +876,10 @@ function validateGroupMaps(data){
     ['Thể lực',data.theLuc?.groups,SV5TRules.REQUIRED_GROUPS.theLuc],['Hội nhập chính',data.hoiNhap?.fixed,SV5TRules.REQUIRED_GROUPS.hoiNhapFixed],
     ['Hội nhập phụ',data.hoiNhap?.groups,SV5TRules.REQUIRED_GROUPS.hoiNhap]
   ];
+  // Một hoạt động chỉ được xét cho MỘT tiêu chí. Danh mục liệt kê cùng một hoạt
+  // động ở nhiều tiêu chí với mã khác nhau (mã có tiền tố nhóm), nên phải đối
+  // chiếu theo tên đã chuẩn hóa trên toàn bộ các nhóm, không chỉ trong một nhóm.
+  const dungOTieuChi=new Map();
   for(const [label,states,allowedIds] of maps){
     if(!SV5TRules.isPlainObject(states)) return `${label}: nhóm tiêu chí không hợp lệ.`;
     const allowed=new Set(allowedIds);
@@ -893,6 +897,9 @@ function validateGroupMaps(data){
           const nameKey=SV5TRules.normalizeActivityName(item.name);
           if(names.has(nameKey))return `${label}: hoạt động trong ${id} bị trùng tên.`;
           names.add(nameKey);
+          const noiDaDung=dungOTieuChi.get(nameKey);
+          if(noiDaDung) return `Hoạt động “${String(item.name).slice(0,120)}” đã được dùng cho tiêu chí ${noiDaDung}; mỗi hoạt động chỉ được xét cho một tiêu chí, không dùng lại ở tiêu chí khác.`;
+          dungOTieuChi.set(nameKey,`${label} ${id}`);
         }
       }
     }

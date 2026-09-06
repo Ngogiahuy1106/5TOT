@@ -655,7 +655,13 @@ function renderGroupCard(container, groupDef, groupState, onChange){
     const sel = document.createElement("select");
     sel.innerHTML = options.length ? options.map(c => `<option value="${escapeHtmlAttr(c.id)}">${escapeHtml(c.name)}</option>`).join("") : `<option value="">(Đã chọn hết danh sách)</option>`;
     const btn = document.createElement("button"); btn.type="button"; btn.textContent = "+ Thêm";
-    btn.onclick = () => { const item=groupDef.items.find(c=>c.id===sel.value); if(!item) return; groupState.items.push({id:item.id,name:item.name,yeuCau:item.yeuCau||"",minhchung:item.minhchung||""}); onChange(); };
+    btn.onclick = () => {
+      const item=groupDef.items.find(c=>c.id===sel.value); if(!item) return;
+      const daDung=findActivityUsedInOtherGroup(item.name,groupDef.id,allCriterionGroupSources());
+      if(daDung){ warnActivityAlreadyUsed(item.name,daDung); return; }
+      groupState.items.push({id:item.id,name:item.name,yeuCau:item.yeuCau||"",minhchung:item.minhchung||""});
+      onChange();
+    };
     row.append(sel,btn); wrap.appendChild(row);
 
     const proposeBtn=document.createElement("button"); proposeBtn.type="button"; proposeBtn.className="btn btn-secondary"; proposeBtn.style.marginBottom="10px"; proposeBtn.style.fontSize="12px";
@@ -670,6 +676,8 @@ function renderGroupCard(container, groupDef, groupState, onChange){
         const resolved=resolveProposedActivity(input.value,groupDef.items,groupState.items);
         if(resolved.status==="empty"){ groupState.proposeOpen=false; onChange(); return; }
         if(resolved.status==="duplicate"){ appAlert(`Hoạt động “${resolved.name}” đã có trong danh sách bên dưới.`,"Hoạt động bị trùng"); return; }
+        const daDung=findActivityUsedInOtherGroup(resolved.item.name,groupDef.id,allCriterionGroupSources());
+        if(daDung){ warnActivityAlreadyUsed(resolved.item.name,daDung); return; }
         groupState.items.push(resolved.item);
         groupState.proposeOpen=false;
         onChange();
@@ -2819,6 +2827,46 @@ function normalizeVN(s){
 
 function normalizeCatalogText(value){
   return normalizeVN(value).replace(/\s+/g," ");
+}
+
+// Một hoạt động chỉ được dùng để xét đúng MỘT tiêu chí. Danh mục Excel cố tình
+// liệt kê cùng một hoạt động ở nhiều tiêu chí (ví dụ Ngày hội "Sinh viên 5 tốt"
+// nằm ở cả Đạo đức lẫn Thể lực), và mỗi lần liệt kê lại nhận một mã khác nhau vì
+// mã có tiền tố theo nhóm. Vì vậy phải đối chiếu theo TÊN đã chuẩn hóa, không
+// phải theo mã.
+function findActivityUsedInOtherGroup(name,currentGroupId,groupSources){
+  const key=window.SV5TRules.normalizeActivityName(name);
+  if(!key) return null;
+  for(const source of groupSources||[]){
+    for(const def of source?.list||[]){
+      if(def.id===currentGroupId) continue;
+      const gs=(source.states||{})[def.id];
+      for(const item of (Array.isArray(gs?.items)?gs.items:[])){
+        if(window.SV5TRules.normalizeActivityName(item?.name)===key) return {groupId:def.id,label:def.label};
+      }
+    }
+  }
+  return null;
+}
+
+// Toàn bộ nhóm tiêu chí có danh sách hoạt động, kèm trạng thái hiện hành của
+// từng nhóm. Hội nhập có hai rổ tách biệt: nhóm chính (fixed) và nhóm phụ.
+function allCriterionGroupSources(){
+  return [
+    {list:GROUPS.daoDuc.list, states:state.daoDuc.groups},
+    {list:GROUPS.hocTap.list, states:state.hocTap.groups},
+    {list:GROUPS.theLuc.list, states:state.theLuc.groups},
+    {list:HOINHAP_FIXED,      states:state.hoiNhap.fixed},
+    {list:GROUPS.hoiNhap.list,states:state.hoiNhap.groups}
+  ];
+}
+
+function warnActivityAlreadyUsed(name,used){
+  appAlert(`Hoạt động “${name}” đã được dùng để xét tiêu chí:
+
+${used.label}
+
+Mỗi hoạt động chỉ được dùng cho một tiêu chí. Nếu muốn dùng ở đây, hãy xóa nó khỏi tiêu chí kia trước.`,"Hoạt động đã dùng ở tiêu chí khác");
 }
 
 // Một đề xuất phải được đối chiếu trước khi thêm:
