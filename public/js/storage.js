@@ -269,12 +269,10 @@ function maybeOfferRestoreDraft(){
 
 function buildEvidenceImagesPayload(){
   const payload = {};
-  // Chỉ gửi ảnh còn thuộc hồ sơ hiện tại. Ảnh mồ côi (hoạt động đã bị xóa, nhóm
-  // chuyển sang "Không đạt"/"bổ sung sau") vẫn nằm trong state vì không có ô nào
-  // để người dùng gỡ; nếu gửi kèm, máy chủ trả "Ảnh minh chứng không thuộc hồ sơ
-  // hiện tại" và sinh viên kẹt cứng không tự thoát được.
-  // Không xóa khỏi state: thêm lại hoạt động thì ảnh cũ dùng được ngay. Ảnh cũ
-  // đã lưu trên kho cũng được server bỏ theo allowedKeys nên không cần dọn ở đây.
+  // Chỉ gửi ảnh còn thuộc hồ sơ hiện tại. Ảnh mồ côi - của hoạt động đã xóa hoặc
+  // nhóm đã chuyển trạng thái - không có ô nào để người dùng gỡ, gửi kèm thì máy
+  // chủ từ chối cả hồ sơ và sinh viên không tự thoát được. Vẫn giữ trong state để
+  // thêm lại hoạt động là dùng được ngay; bản đã lưu trên kho do server tự dọn.
   const allowed = currentEvidenceImageKeys();
   Object.entries(state.evidenceImages).forEach(([key, img]) => {
     if(!img?.dataUrl || !allowed.has(key)) return;

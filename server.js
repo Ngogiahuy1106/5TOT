@@ -1,4 +1,5 @@
-// server.js - sv5tot-hoso
+// Máy chủ hồ sơ Sinh viên 5 tốt: phục vụ trang tĩnh, API nhận và duyệt hồ sơ,
+// kho ảnh minh chứng trên Cloudflare R2. Dữ liệu ở PostgreSQL qua Prisma.
 require('dotenv').config();
 
 const path = require('path');
@@ -19,12 +20,12 @@ const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_BUCKET = (process.env.R2_BUCKET || '').trim();
 const R2_REGION = 'auto';
 const R2_HOST = R2_ACCOUNT_ID ? `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '';
-// Ghim CSP vao dung endpoint cua tai khoan nay. Dung *.r2.cloudflarestorage.com
-// se cho phep bucket cua bat ky tai khoan Cloudflare nao khac tro anh vao trang.
+// Ghim CSP vào đúng endpoint của tài khoản này. Dùng *.r2.cloudflarestorage.com
+// sẽ cho phép bucket của bất kỳ tài khoản Cloudflare nào khác trỏ ảnh vào trang.
 const R2_CSP_ORIGIN = R2_HOST ? `https://${R2_HOST}` : '';
 const STORAGE_SIGNED_URL_TTL = 15 * 60;
-// Tran thoi gian cho mot lo xoa chay dong bo trong request; qua han thi phan
-// con lai chuyen sang hang doi StorageCleanupJob.
+// Trần thời gian cho một lô xóa chạy đồng bộ trong request; quá hạn thì phần
+// còn lại chuyển sang hàng đợi StorageCleanupJob.
 const STORAGE_DELETE_DEADLINE_MS = 10_000;
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const SIGNED_URL_CACHE = new Map();
@@ -151,6 +152,7 @@ function rateLimit({windowMs,max,prefix,keyOf,label}){
   };
 }
 // Hạn mức theo IP nới rộng: chỉ để chặn flood, không phải để chặn người dùng thật.
+// Lý do ở studentKeyOf phía trên.
 const globalApiLimit=rateLimit({windowMs:60_000,max:600,prefix:'api',label:'gửi yêu cầu'});
 // Đăng nhập: chỉ ĐẾM LẦN SAI (xử lý trong chính route /api/auth), đăng nhập đúng
 // không tiêu tốn hạn mức, nên cả Ban ngồi chung một phòng vẫn đăng nhập được.
@@ -160,27 +162,15 @@ const reviewLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'review',keyOf:req
 const submitLimit=rateLimit({windowMs:10*60_000,max:8,prefix:'submit',keyOf:studentKeyOf,label:'gửi hồ sơ'});
 const submitIpLimit=rateLimit({windowMs:10*60_000,max:120,prefix:'submit-ip',label:'gửi hồ sơ'});
 const lookupLimit=rateLimit({windowMs:5*60_000,max:120,prefix:'lookup',keyOf:req=>`${clientIpHash(req)}:${studentKeyOf(req)}`,label:'tra cứu'});
-// Chống dò MSSV mà KHÔNG khóa oan ký túc xá.
-//
-// Hạn mức theo IP thuần không dùng được ở đây: cả một tòa ký túc ra Internet
-// bằng một IP NAT, ngày báo kết quả có thể hàng trăm sinh viên cùng tra.
-// Nhưng người tra hợp lệ và kẻ dò khác nhau ở một điểm rất rõ: sinh viên biết
-// MSSV của mình nên hầu như luôn nhận 200, còn kẻ quét dãy số nhận 404 gần như
-// mọi lượt (chỉ vài trăm MSSV có hồ sơ trong không gian ~230.000).
-//
-// Vì vậy chỉ đếm những MSSV KHÁC NHAU mà IP đó tra ra "không tìm thấy". Sinh
-// viên gõ nhầm một hai lần không sao; tra đi tra lại đúng MSSV của mình thì
-// không tốn thêm lượt nào. Kẻ dò thì chạm trần sau LOOKUP_MISS_MAX lượt.
-// Đánh đổi có ý thức: khi ngân sách cạn thì CẢ IP đó bị chặn, kể cả sinh viên
-// tra MSSV có thật. Không tránh được, vì phải biết MSSV có tồn tại hay không
-// mới phân biệt được - mà trả lời rồi thì đã lộ mất điều cần giấu.
-//
-// Bù lại, chỉ lượt "không tìm thấy" mới tốn ngân sách, nên một tòa ký túc toàn
-// sinh viên tra MSSV của chính mình gần như không bao giờ chạm trần. Ký túc chỉ
-// bị chặn khi có người trên đúng IP đó thật sự đang quét - và chỉ 15 phút.
-//
-// 25 lượt/15 phút hạ tốc độ quét từ ~230.000 MSSV trong 6,4 giờ xuống còn
-// khoảng 96 ngày cho một IP.
+// Chống dò MSSV mà không khóa oan ký túc xá. Hạn mức theo IP thuần không dùng
+// được vì cả tòa ký túc ra Internet bằng một IP NAT. Điểm khác nhau giữa sinh
+// viên và kẻ dò là kết quả tra: sinh viên biết MSSV của mình nên gần như luôn
+// nhận 200, kẻ quét dãy số nhận 404 gần như mọi lượt. Vì vậy chỉ đếm số MSSV
+// KHÁC NHAU mà một IP tra ra "không tìm thấy"; tra lại cùng một MSSV không tốn
+// thêm lượt. Đánh đổi: hết ngân sách thì cả IP bị chặn 15 phút, kể cả người tra
+// thật - không tránh được, vì muốn phân biệt thì phải trả lời MSSV có tồn tại
+// hay không, mà trả lời rồi là đã lộ. 25 lượt/15 phút kéo thời gian quét hết
+// ~230.000 MSSV từ 6,4 giờ lên khoảng 96 ngày cho mỗi IP.
 const LOOKUP_MISS_WINDOW_MS=15*60_000;
 const LOOKUP_MISS_MAX=25;
 async function lookupMissBudgetExceeded(req){
@@ -478,16 +468,12 @@ async function deleteOneStorageObject(objectPath){
   }
   return lastError||'unknown error';
 }
-// R2 không có API xóa theo mảng prefix như Supabase (một request xóa cả lô);
-// DeleteObjects của S3 cần body XML + Content-MD5 nên ở đây xóa từng object.
-//
-// Một hồ sơ có thể có tới 80 ảnh và tới 160 khóa cần xóa (xem phần validate bên
-// dưới), nên xóa tuần tự sẽ biến một sự cố R2 thành hàng giờ treo request. Vì
-// vậy chạy tối đa 5 luồng song song, và sau STORAGE_DELETE_DEADLINE_MS thì
-// ngừng nhận object mới - phần chưa xong được đẩy sang hàng đợi
-// StorageCleanupJob để worker nền dọn sau. Hạn chót chỉ chặn việc BẮT ĐẦU một
-// object mới chứ không cắt ngang object đang chạy, nên lời gọi chỉ có một
-// object (worker dọn dẹp) không bị ảnh hưởng.
+// R2 phải xóa từng object: DeleteObjects của S3 cần body XML kèm Content-MD5.
+// Một hồ sơ có thể có tới 80 ảnh nên xóa tuần tự sẽ biến một sự cố R2 thành
+// hàng giờ treo request; ở đây chạy tối đa 5 luồng và sau
+// STORAGE_DELETE_DEADLINE_MS thì ngừng nhận object mới, phần còn lại đẩy sang
+// hàng đợi StorageCleanupJob. Hạn chót chỉ chặn việc bắt đầu object mới, không
+// cắt ngang object đang chạy.
 async function deleteStorageObjects(paths,{throwOnFailure=false,queueOnFailure=false}={}) {
   const objectPaths = [...new Set((paths || []).filter(Boolean))];
   if (!objectPaths.length || !storageIsConfigured()) return true;
@@ -587,8 +573,8 @@ async function serializableTransaction(work,maxAttempts=3){
   throw new Error('Không hoàn tất được giao dịch đồng thời.');
 }
 async function lockSubmissionMssv(tx,mssv){
-  // pg_advisory_xact_lock() tra ve kieu void; $queryRaw khong deserialize duoc
-  // (P2010) nen phai dung $executeRaw - khoa van duoc giu den het transaction.
+  // pg_advisory_xact_lock() trả về kiểu void mà $queryRaw không đọc được (P2010),
+  // nên phải dùng $executeRaw. Khóa vẫn được giữ tới hết transaction.
   await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sv5t-submission:${String(mssv||'').trim()}`},0))`);
 }
 function normalizeReviewerName(value){
@@ -852,9 +838,8 @@ function validateActivityArrays(data){
   }
   for(const item of data.khac?.items||[]) if(!item||typeof item!=='object'||!String(item.text||'').trim()||String(item.text).length>500) return 'Thành tích khác không hợp lệ.';
   // Chặn theo mã không đủ: mỗi đề xuất tự sinh một mã riêng nên hai dòng cùng tên
-  // vẫn lọt. Với tình nguyện thì đây là lỗ hổng thật, vì tổng ngày được cộng dồn
-  // theo từng dòng nên khai trùng một hoạt động sẽ thổi phồng số ngày đạt được.
-  // Dùng đúng normalizeActivityName mà frontend dùng để hai bên không lệch luật.
+  // vẫn lọt, và tổng ngày tình nguyện cộng dồn theo từng dòng nên khai trùng sẽ
+  // thổi phồng số ngày. Dùng chung normalizeActivityName với frontend.
   for(const [label,items] of [['tình nguyện',data.tinhNguyen?.items||[]],['thành tích khác',data.khac?.items||[]]]){
     const ids=new Set(),names=new Set();
     for(const item of items){
@@ -876,9 +861,9 @@ function validateGroupMaps(data){
     ['Thể lực',data.theLuc?.groups,SV5TRules.REQUIRED_GROUPS.theLuc],['Hội nhập chính',data.hoiNhap?.fixed,SV5TRules.REQUIRED_GROUPS.hoiNhapFixed],
     ['Hội nhập phụ',data.hoiNhap?.groups,SV5TRules.REQUIRED_GROUPS.hoiNhap]
   ];
-  // Một hoạt động chỉ được xét cho MỘT tiêu chí. Danh mục liệt kê cùng một hoạt
-  // động ở nhiều tiêu chí với mã khác nhau (mã có tiền tố nhóm), nên phải đối
-  // chiếu theo tên đã chuẩn hóa trên toàn bộ các nhóm, không chỉ trong một nhóm.
+  // Một hoạt động chỉ được xét cho một tiêu chí. Danh mục liệt kê cùng một hoạt
+  // động ở nhiều tiêu chí, mỗi lần một mã khác nhau, nên phải so theo tên trên
+  // toàn bộ các nhóm chứ không riêng từng nhóm.
   const dungOTieuChi=new Map();
   for(const [label,states,allowedIds] of maps){
     if(!SV5TRules.isPlainObject(states)) return `${label}: nhóm tiêu chí không hợp lệ.`;
@@ -892,8 +877,6 @@ function validateGroupMaps(data){
         for(const item of gs.items){
           if(!SV5TRules.isPlainObject(item)||!String(item.name||'').trim()||String(item.name).length>500)return `${label}: hoạt động trong ${id} không hợp lệ.`;
           const itemId=String(item.id||item.name||'');if(itemId.length>150||ids.has(itemId))return `${label}: hoạt động trong ${id} bị trùng hoặc có mã quá dài.`;ids.add(itemId);
-          // Mỗi đề xuất nhận một mã riêng nên chống trùng theo mã không bắt được
-          // hai đề xuất cùng tên; điều kiện đạt chỉ đếm số phần tử nên phải chặn.
           const nameKey=SV5TRules.normalizeActivityName(item.name);
           if(names.has(nameKey))return `${label}: hoạt động trong ${id} bị trùng tên.`;
           names.add(nameKey);
@@ -989,13 +972,11 @@ function validateSubmissionPayload(body) {
   return null;
 }
 
-// Cấu hình chỉ đổi khi Ban bấm lưu, nhưng endpoint này nằm trên đường tới màn
-// hình đầu tiên và mỗi lượt đi Supabase mất ~0,8 giây. Giữ lại trong bộ nhớ
-// tiến trình, xóa ngay khi có thay đổi, và vẫn đặt hạn ngắn phòng khi Render
-// chạy nhiều instance - instance này không biết instance kia vừa ghi gì.
-//
-// Cố ý KHÔNG cache getSubmissionWindow(): đó là cổng chặn nộp hồ sơ, đọc phải
-// dữ liệu cũ có thể cho nộp sau hạn. Chậm hơn một chút ở đúng chỗ cần chắc.
+// Cấu hình hiếm khi đổi nhưng nằm trên đường tới màn hình đầu tiên, mỗi lượt đi
+// Supabase mất ~0,8 giây. Giữ trong bộ nhớ tiến trình, xóa ngay khi có thay đổi,
+// vẫn đặt hạn ngắn phòng khi Render chạy nhiều instance.
+// Cố ý không cache getSubmissionWindow(): đó là cổng chặn nộp hồ sơ, đọc phải
+// dữ liệu cũ có thể cho nộp sau hạn.
 const CONFIG_CACHE_TTL_MS=30_000;
 let configCache=null,configCachedAt=0;
 function invalidateConfigCache(){ configCache=null;configCachedAt=0; }

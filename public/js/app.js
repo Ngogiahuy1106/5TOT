@@ -1,4 +1,7 @@
 
+// Toàn bộ biểu mẫu hồ sơ phía sinh viên: 9 bước khai báo, bảng kiểm minh chứng,
+// bản xem trước và phần xuất file Word.
+
 /* =========================================================
    1. DỮ LIỆU CẤU HÌNH
    ========================================================= */
@@ -1538,10 +1541,9 @@ function groupEvidenceItems(list, groupsState){
   list.forEach(g => {
     const gs = groupsState[g.id];
     if(!gs) return;
-    // Cùng luật với backend (collectGroupEvidence trong server.js): nhóm chưa xác
-    // nhận "Đạt" hoặc đang để "bổ sung sau" thì không sinh minh chứng. Trước đây
-    // frontend vẫn hiện ô tải ảnh cho các nhóm này, nên sinh viên tải lên được
-    // những khóa mà máy chủ sẽ từ chối khi gửi hồ sơ.
+    // Cùng luật với collectGroupEvidence trong server.js: nhóm chưa xác nhận
+    // "Đạt" hoặc đang để "bổ sung sau" thì không sinh minh chứng. Lệch luật ở đây
+    // là sinh viên tải được ảnh vào khóa mà máy chủ sẽ từ chối lúc gửi.
     if(gs.yes !== true || gs.pending === true) return;
     if(g.type === "sheet" || g.type === "manualList"){
       const picked = Array.isArray(gs.items) ? gs.items : [];
@@ -1727,14 +1729,11 @@ function formatImageBytes(bytes){
   return value>=1024*1024?`${(value/1024/1024).toFixed(1)} MB`:`${Math.max(1,Math.round(value/1024))} KB`;
 }
 
-// Link xem ảnh của R2 chỉ sống 15 phút, còn phiên chấm hồ sơ kéo dài tới 8 giờ,
-// nên ảnh sẽ vỡ giữa chừng khi giao diện dựng lại thẻ <img> bằng link đã hết hạn.
-// Gặp ảnh vỡ thì xin lứa link mới, nhưng phải chặn vòng lặp: mỗi lứa link chỉ
-// được xin lại một lần, và tổng số lần xin có trần.
+// Link xem ảnh R2 sống 15 phút còn phiên chấm sống 8 giờ, nên ảnh sẽ vỡ giữa
+// chừng; gặp ảnh vỡ thì xin lứa link mới. Trần dưới đây đếm số lần hỏng liên
+// tiếp chứ không phải tổng cả phiên: hết hạn vài chục lần là bình thường, chỉ
+// hỏng dồn dập trong vài giây mới là kho ảnh có vấn đề.
 const MAX_EVIDENCE_URL_REFRESH = 3;
-// Trần đếm số lần hỏng LIÊN TIẾP chứ không phải tổng số lần trong cả phiên chấm:
-// link sống 15 phút mà phiên chấm sống 8 giờ, nên hết hạn hàng chục lần là bình
-// thường. Chỉ khi hỏng dồn dập trong vài giây thì kho ảnh mới thật sự có vấn đề.
 const EVIDENCE_URL_REFRESH_RESET_MS = 60_000;
 function evidenceUrlRefreshDecision({adminMode,imageGeneration,currentGeneration,refreshCount,lastRefreshAt,now,maxRefresh,resetMs}){
   if(!adminMode) return "skip-not-admin";
@@ -1748,9 +1747,9 @@ function evidenceUrlRefreshDecision({adminMode,imageGeneration,currentGeneration
   return "refresh";
 }
 
-// Link đơn do sinh viên tự nhập. Chỉ dựng thẻ liên kết khi đúng là URL https:
-// giá trị dạng javascript:... không chứa dấu ngoặc nhọn nên lọt qua bộ lọc HTML,
-// và sẽ chạy ngay trên máy người đang chấm hồ sơ nếu họ bấm vào.
+// Link đơn do sinh viên tự nhập nên chỉ dựng thẻ liên kết khi đúng là URL https.
+// Giá trị dạng javascript:... không có dấu ngoặc nhọn nên lọt bộ lọc HTML, và sẽ
+// chạy trên máy người đang chấm nếu họ bấm vào.
 function evidenceFormLinkHref(value){
   const raw=String(value==null?"":value).trim();
   if(!raw) return null;
@@ -1855,9 +1854,9 @@ function normalizeEvidenceStatus(value){
   return ["later","form"].includes(value) ? value : "";
 }
 
-// Đối xứng với currentExpectedImageKeys() trong server.js: đây là toàn bộ khóa
-// ảnh mà hồ sơ ở trạng thái hiện tại chấp nhận. Dùng để loại ảnh mồ côi khỏi
-// payload trước khi gửi (ví dụ sinh viên đã tải ảnh rồi xóa hoạt động đó đi).
+// Toàn bộ khóa ảnh mà hồ sơ ở trạng thái hiện tại chấp nhận - đối xứng với
+// currentExpectedImageKeys() trong server.js. Dùng để loại ảnh mồ côi khỏi
+// payload, ví dụ sinh viên tải ảnh rồi xóa chính hoạt động đó đi.
 function currentEvidenceImageKeys(){
   const keys=new Set();
   EVIDENCE_CARDS.forEach(card=>{
@@ -2829,11 +2828,9 @@ function normalizeCatalogText(value){
   return normalizeVN(value).replace(/\s+/g," ");
 }
 
-// Một hoạt động chỉ được dùng để xét đúng MỘT tiêu chí. Danh mục Excel cố tình
-// liệt kê cùng một hoạt động ở nhiều tiêu chí (ví dụ Ngày hội "Sinh viên 5 tốt"
-// nằm ở cả Đạo đức lẫn Thể lực), và mỗi lần liệt kê lại nhận một mã khác nhau vì
-// mã có tiền tố theo nhóm. Vì vậy phải đối chiếu theo TÊN đã chuẩn hóa, không
-// phải theo mã.
+// Một hoạt động chỉ được dùng để xét một tiêu chí. Danh mục Excel liệt kê cùng
+// một hoạt động ở nhiều tiêu chí và mỗi lần cấp một mã khác nhau (mã có tiền tố
+// nhóm), nên phải so theo tên đã chuẩn hóa chứ không theo mã.
 function findActivityUsedInOtherGroup(name,currentGroupId,groupSources){
   const key=window.SV5TRules.normalizeActivityName(name);
   if(!key) return null;
@@ -2849,8 +2846,7 @@ function findActivityUsedInOtherGroup(name,currentGroupId,groupSources){
   return null;
 }
 
-// Toàn bộ nhóm tiêu chí có danh sách hoạt động, kèm trạng thái hiện hành của
-// từng nhóm. Hội nhập có hai rổ tách biệt: nhóm chính (fixed) và nhóm phụ.
+// Hội nhập có hai rổ tách biệt: nhóm chính (fixed) và nhóm phụ.
 function allCriterionGroupSources(){
   return [
     {list:GROUPS.daoDuc.list, states:state.daoDuc.groups},
@@ -2869,12 +2865,10 @@ ${used.label}
 Mỗi hoạt động chỉ được dùng cho một tiêu chí. Nếu muốn dùng ở đây, hãy xóa nó khỏi tiêu chí kia trước.`,"Hoạt động đã dùng ở tiêu chí khác");
 }
 
-// Một đề xuất phải được đối chiếu trước khi thêm:
-//  - trùng tên trong danh mục chính thức -> thêm như mục chính thức, KHÔNG gắn
-//    cờ proposed (nếu không báo cáo sẽ tô xanh như đề xuất mới và Ban phải đi
-//    thẩm định một hoạt động vốn đã có sẵn);
-//  - trùng tên đã có trong danh sách -> từ chối, vì điều kiện đạt chỉ đếm
-//    items.length nên hai dòng trùng tên sẽ thoả minCount một cách sai lệch.
+// Đối chiếu tên đề xuất trước khi thêm. Trùng danh mục chính thức thì thêm như
+// mục chính thức, không gắn cờ proposed - nếu không báo cáo sẽ tô xanh và Ban
+// phải đi thẩm định một hoạt động vốn đã có sẵn. Trùng dòng đã có thì từ chối,
+// vì điều kiện đạt chỉ đếm số phần tử.
 function resolveProposedActivity(rawName,catalogItems,existingItems){
   const name=String(rawName||"").trim();
   if(!name) return {status:"empty"};

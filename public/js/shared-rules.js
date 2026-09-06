@@ -1,3 +1,5 @@
+// Các luật dùng chung cho cả trình duyệt và máy chủ: ngưỡng điểm, điều kiện xét,
+// chuẩn hóa tên hoạt động. Để một chỗ để hai bên không lệch luật.
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports) module.exports=api;
