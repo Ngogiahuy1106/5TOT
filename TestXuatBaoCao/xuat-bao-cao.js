@@ -9,7 +9,7 @@ async function exportDocx(){
     appAlert("Không tải được thư viện tạo file Word (cần kết nối mạng). Vui lòng kiểm tra lại kết nối mạng rồi thử lại.","Không thể xuất Word");
     return;
   }
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, convertInchesToTwip, VerticalAlign, UnderlineType, FrameAnchorType, FrameWrap, BorderStyle, HeightRule } = docx;
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, convertInchesToTwip, VerticalAlign, UnderlineType, BorderStyle, HeightRule, TableLayoutType } = docx;
 
   const p = state.personal;
   const mssvCheck = validateMSSV(p.mssv);
@@ -62,124 +62,137 @@ async function exportDocx(){
     Ppar([T("Email: ", {bold:true}), T(email)])
   ];
 
-  function mkCell(children, widthPct, opts){
+  function mkCell(children, cotIndex, opts){
     return new TableCell(Object.assign({
-      width:{size:widthPct, type:WidthType.PERCENTAGE},
+      width:{size: COT_RONG[cotIndex], type: WidthType.DXA},
       margins:{top:60, bottom:60, left:120, right:100},
       children: children.length ? children : [Ppar([T("")])]
     }, opts||{}));
   }
-  function headerCell(text){
-    return mkCell([Ppar([T(text, {bold:true})], {alignment:AlignmentType.CENTER})], 14.3);
+  function headerCell(text, cotIndex){
+    return mkCell([Ppar([T(text, {bold:true})], {alignment:AlignmentType.CENTER})], cotIndex);
   }
 
-  // ---- Khối tiêu đề: dùng 3 KHUNG NỔI (frame) độc lập, neo tuyệt đối cùng y=0,
-  //      thay vì dùng bảng - vì bảng KHÔNG chảy quanh khung nổi được (chỉ đoạn văn bản
-  //      thường mới chảy quanh khung nổi), nên trước đây bảng bị đẩy xuống dưới khung ảnh
-  //      thay vì nằm ngang hàng. Dùng frame cho cả 3 khối đảm bảo luôn cùng 1 hàng. ----
+  // ---- Khối tiêu đề: MỘT bảng 3 cột không viền (ảnh 4x6 | tên tổ chức | HSV VN).
+  //      Trước đây dùng 3 khung nổi neo tuyệt đối; Word đọc đúng nhưng Google Docs
+  //      không hỗ trợ khung nổi nên khi mở trên Drive cả 3 khối rơi xuống xếp chồng
+  //      dọc. Bảng thì Word và Google Docs dựng giống hệt nhau. ----
   const CM_TWIP = 566.929;
-  const PHOTO_W_CM = 2.35; // ngang
-  const PHOTO_H_CM = 3.05; // dọc
-  const PAGE_CONTENT_WIDTH = convertInchesToTwip(11.69) - 720 - 720; // khổ ngang trừ lề trái/phải
-  const photoGap = 150; // khoảng cách nhỏ giữa khung ảnh và khối tổ chức
+  const PHOTO_W_CM = 2.35;
+  const PHOTO_H_CM = 3.05;
+  const PAGE_CONTENT_WIDTH = convertInchesToTwip(11.69) - 720 - 720; // khổ ngang trừ lề
+
+  // Google Docs bỏ qua chiều rộng dạng phần trăm khi nhập .docx rồi co bảng về bề
+  // rộng tối thiểu theo nội dung, khiến mỗi cột chỉ còn vừa một ký tự. Vì vậy mọi
+  // chiều rộng ở đây đều tính ra twip (DXA) và bảng khoá layout FIXED.
+  const COT_TY_LE = [14, 14.3, 14.3, 14.3, 14.3, 14.3, 14.3];
+  const COT_RONG = (() => {
+    const tong = COT_TY_LE.reduce((a, b) => a + b, 0);
+    const w = COT_TY_LE.map(x => Math.round(PAGE_CONTENT_WIDTH * x / tong));
+    w[0] += PAGE_CONTENT_WIDTH - w.reduce((a, b) => a + b, 0); // bù sai số làm tròn
+    return w;
+  })();
+
   const photoWidthTwip = Math.round(PHOTO_W_CM * CM_TWIP);
   const headerHeightTwip = Math.round(PHOTO_H_CM * CM_TWIP);
-  const orgTextX = photoWidthTwip + photoGap;
   const orgTextWidth = Math.round((PAGE_CONTENT_WIDTH - photoWidthTwip) * 0.52);
-  const hsvX = orgTextX + orgTextWidth;
-  const hsvWidth = PAGE_CONTENT_WIDTH - orgTextX - orgTextWidth;
-  const HEADER_SPACER_AFTER = 260; // canh để có khoảng 1 dòng trống trước tiêu đề
+  const hsvWidth = PAGE_CONTENT_WIDTH - photoWidthTwip - orgTextWidth;
 
-  const photoFrame = Ppar([T("Ảnh 4x6", {bold:true})], {
-    alignment: AlignmentType.CENTER,
-    spacing: { before:0, after:0 },
-    frame: {
-      type: "absolute",
-      position: { x: 0, y: 0 },
-      width: photoWidthTwip,
-      height: headerHeightTwip,
-      anchor: { horizontal: FrameAnchorType.MARGIN, vertical: FrameAnchorType.MARGIN },
-      wrap: FrameWrap.AROUND
-    },
-    border: {
-      top:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-      bottom:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-      left:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-      right:{style:BorderStyle.SINGLE, size:4, color:"000000"}
-    }
+  const KHONG_VIEN = {
+    top:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    bottom:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    left:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    right:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    insideHorizontal:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    insideVertical:{style:BorderStyle.NONE, size:0, color:"FFFFFF"}
+  };
+  const VIEN_DEN = {
+    top:{style:BorderStyle.SINGLE, size:4, color:"000000"},
+    bottom:{style:BorderStyle.SINGLE, size:4, color:"000000"},
+    left:{style:BorderStyle.SINGLE, size:4, color:"000000"},
+    right:{style:BorderStyle.SINGLE, size:4, color:"000000"}
+  };
+
+  const headerTable = new Table({
+    width:{size: PAGE_CONTENT_WIDTH, type: WidthType.DXA},
+    columnWidths: [photoWidthTwip, orgTextWidth, hsvWidth],
+    layout: TableLayoutType.FIXED,
+    borders: KHONG_VIEN,
+    rows:[ new TableRow({
+      height:{ value: headerHeightTwip, rule: HeightRule.ATLEAST },
+      children:[
+        new TableCell({
+          width:{size: photoWidthTwip, type: WidthType.DXA},
+          borders: VIEN_DEN,
+          verticalAlign: VerticalAlign.CENTER,
+          children:[ Ppar([T("Ảnh 4x6", {bold:true})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}}) ]
+        }),
+        new TableCell({
+          width:{size: orgTextWidth, type: WidthType.DXA},
+          verticalAlign: VerticalAlign.TOP,
+          children:[
+            Ppar([T("HỘI SINH VIÊN VIỆT NAM THÀNH PHỐ HÀ NỘI", {size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}}),
+            Ppar([T("BCH ĐH BÁCH KHOA HÀ NỘI", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}}),
+            Ppar([T("***", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}})
+          ]
+        }),
+        new TableCell({
+          width:{size: hsvWidth, type: WidthType.DXA},
+          verticalAlign: VerticalAlign.TOP,
+          children:[
+            Ppar([T("HỘI SINH VIÊN VIỆT NAM", {bold:true, size:28, underline:{type:UnderlineType.SINGLE}})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}})
+          ]
+        })
+      ]
+    })]
   });
 
-  // Cả 3 đoạn văn bản của khối tên tổ chức dùng CHUNG 1 cấu hình frame (cùng x,y,w,h)
-  // để Word gộp chúng vào cùng một khung nổi duy nhất.
-  const orgFrameCfg = {
-    type: "absolute",
-    position: { x: orgTextX, y: 0 },
-    width: orgTextWidth,
-    height: headerHeightTwip,
-    rule: HeightRule.AUTO,
-    anchor: { horizontal: FrameAnchorType.MARGIN, vertical: FrameAnchorType.MARGIN },
-    wrap: FrameWrap.AROUND
-  };
-  const orgLine1 = Ppar([T("HỘI SINH VIÊN VIỆT NAM THÀNH PHỐ HÀ NỘI", {size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
-  const orgLine2 = Ppar([T("BCH ĐH BÁCH KHOA HÀ NỘI", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
-  const orgLine3 = Ppar([T("***", {bold:true, size:26})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: orgFrameCfg});
-
-  const hsvFrameCfg = {
-    type: "absolute",
-    position: { x: hsvX, y: 0 },
-    width: hsvWidth,
-    height: headerHeightTwip,
-    rule: HeightRule.AUTO,
-    anchor: { horizontal: FrameAnchorType.MARGIN, vertical: FrameAnchorType.MARGIN },
-    wrap: FrameWrap.AROUND
-  };
-  const hsvLine = Ppar([T("HỘI SINH VIÊN VIỆT NAM", {bold:true, size:28, underline:{type:UnderlineType.SINGLE}})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}, frame: hsvFrameCfg});
-
-  // Đoạn trống để "đẩy" nội dung phía sau (tiêu đề báo cáo) xuống dưới, tránh đè lên
-  // 3 khung nổi ở trên (vì khung nổi không chiếm chỗ trong dòng chảy văn bản bình thường).
-  // Giá trị được đo & hiệu chỉnh thực nghiệm (xem ghi chú lúc build) để chỉ cách đúng ~1 dòng.
-  const headerSpacer = Ppar([T("")], { spacing:{ before:0, after: HEADER_SPACER_AFTER } });
-
   const thanhTichRow = new TableRow({children:[
-    new TableCell({columnSpan:7, margins:{top:60,bottom:60,left:120,right:100}, children:[
+    new TableCell({columnSpan:7, width:{size:PAGE_CONTENT_WIDTH, type:WidthType.DXA}, margins:{top:60,bottom:60,left:120,right:100}, children:[
       Ppar([T("THÀNH TÍCH", {bold:true, size:20})], {alignment:AlignmentType.CENTER})
     ]})
   ]});
 
   const headerRow = new TableRow({children:[
-    mkCell([Ppar([T("")])], 14),
-    headerCell("Đạo đức"), headerCell("Học tập"), headerCell("Thể lực"),
-    headerCell("Tình nguyện"), headerCell("Hội nhập"), headerCell("Các thành tích khác")
+    mkCell([Ppar([T("")])], 0),
+    headerCell("Đạo đức", 1), headerCell("Học tập", 2), headerCell("Thể lực", 3),
+    headerCell("Tình nguyện", 4), headerCell("Hội nhập", 5), headerCell("Các thành tích khác", 6)
   ]});
 
   const dataRow = new TableRow({children:[
-    mkCell(personalLines, 14),
-    mkCell(cellParagraphs(numberLines(getDaoDucLines())), 14.3),
-    mkCell(cellParagraphs(numberLines(getHocTapLines())), 14.3),
-    mkCell(cellParagraphs(numberLines(getTheLucLines())), 14.3),
-    mkCell(cellParagraphs(numberLines(getTinhNguyenLines())), 14.3),
-    mkCell(cellParagraphs(numberLines(getHoiNhapLines())), 14.3),
-    mkCell(cellParagraphs(numberLines(getSimpleLines(state.khac.items))), 14.3),
+    mkCell(personalLines, 0),
+    mkCell(cellParagraphs(numberLines(getDaoDucLines())), 1),
+    mkCell(cellParagraphs(numberLines(getHocTapLines())), 2),
+    mkCell(cellParagraphs(numberLines(getTheLucLines())), 3),
+    mkCell(cellParagraphs(numberLines(getTinhNguyenLines())), 4),
+    mkCell(cellParagraphs(numberLines(getHoiNhapLines())), 5),
+    mkCell(cellParagraphs(numberLines(getSimpleLines(state.khac.items))), 6),
   ]});
 
   const mainTable = new Table({
-    width:{size:100, type:WidthType.PERCENTAGE},
+    width:{size: PAGE_CONTENT_WIDTH, type: WidthType.DXA},
+    columnWidths: COT_RONG,
+    layout: TableLayoutType.FIXED,
     rows:[thanhTichRow, headerRow, dataRow]
   });
 
   // ---- Khối xác nhận + chữ ký (giữ đúng nội dung file mẫu, cỡ chữ 11) ----
+  const XN_RONG = [Math.round(PAGE_CONTENT_WIDTH*0.33), Math.round(PAGE_CONTENT_WIDTH*0.34), 0];
+  XN_RONG[2] = PAGE_CONTENT_WIDTH - XN_RONG[0] - XN_RONG[1];
   const confirmTable = new Table({
-    width:{size:100, type:WidthType.PERCENTAGE},
-    borders:{ top:{style:"none",size:0,color:"FFFFFF"}, bottom:{style:"none",size:0,color:"FFFFFF"}, left:{style:"none",size:0,color:"FFFFFF"}, right:{style:"none",size:0,color:"FFFFFF"}, insideHorizontal:{style:"none",size:0,color:"FFFFFF"}, insideVertical:{style:"none",size:0,color:"FFFFFF"} },
+    width:{size: PAGE_CONTENT_WIDTH, type: WidthType.DXA},
+    columnWidths: XN_RONG,
+    layout: TableLayoutType.FIXED,
+    borders: KHONG_VIEN,
     rows:[ new TableRow({children:[
-      new TableCell({width:{size:33,type:WidthType.PERCENTAGE}, children:[
+      new TableCell({width:{size:XN_RONG[0], type:WidthType.DXA}, children:[
         Ppar([T("XÁC NHẬN CỦA BAN CHẤP HÀNH", {bold:true, size:22})], {alignment:AlignmentType.CENTER}),
         Ppar([T("HỘI SINH VIÊN TRƯỜNG " + (p.khoaTruong||"").toUpperCase(), {bold:true, size:22})], {alignment:AlignmentType.CENTER})
       ]}),
-      new TableCell({width:{size:34,type:WidthType.PERCENTAGE}, children:[
+      new TableCell({width:{size:XN_RONG[1], type:WidthType.DXA}, children:[
         Ppar([T("XÁC NHẬN CỦA BAN THƯ KÝ HỘI SINH VIÊN ĐẠI HỌC", {bold:true, size:22})], {alignment:AlignmentType.CENTER})
       ]}),
-      new TableCell({width:{size:33,type:WidthType.PERCENTAGE}, children:[
+      new TableCell({width:{size:XN_RONG[2], type:WidthType.DXA}, children:[
         Ppar([T("Hà Nội, ngày " + (state.reportDate.day || "......") + " tháng " + (state.reportDate.month || "......") + " năm " + (state.reportDate.year || String(new Date().getFullYear())), {italics:true, size:22})], {alignment:AlignmentType.CENTER}),
         Ppar([T("NGƯỜI BÁO CÁO", {bold:true, size:22})], {alignment:AlignmentType.CENTER})
       ]})
@@ -200,12 +213,8 @@ async function exportDocx(){
         }
       },
       children:[
-        photoFrame,
-        orgLine1,
-        orgLine2,
-        orgLine3,
-        hsvLine,
-        headerSpacer,
+        headerTable,
+        Ppar([T("")]),
         Ppar([T("BÁO CÁO THÀNH TÍCH", {bold:true, size:32})], {alignment:AlignmentType.CENTER}),
         Ppar([T("ĐỀ NGHỊ CÔNG NHẬN DANH HIỆU SINH VIÊN 5 TỐT CẤP ĐẠI HỌC", {bold:true, size:28})], {alignment:AlignmentType.CENTER}),
         Ppar([T("NĂM " + REPORT_YEAR, {bold:true, size:28})], {alignment:AlignmentType.CENTER}),
