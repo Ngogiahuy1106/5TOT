@@ -2342,8 +2342,7 @@ function renderPreview(){
       <h2>Xem trước báo cáo</h2>
       <p class="sub">Kiểm tra lại toàn bộ nội dung trước khi xuất file. File xuất ra giữ đúng khối tiêu đề/xác nhận của mẫu gốc, khổ ngang.</p>
 
-      <div class="preview-doc" id="previewDoc" style="position:relative">
-        <div style="position:absolute; top:0; left:0; width:70px; height:91px; text-align:center; font-size:11px; font-weight:bold; padding-top:4px; border:1px solid #000; box-sizing:border-box; z-index:2">Ảnh 4x6</div>
+      <div class="preview-doc" id="previewDoc">
         <table style="margin-bottom:10px">
           <tr>
             <td style="width:60%;font-size:16.9px" class="center">HỘI SINH VIÊN VIỆT NAM THÀNH PHỐ HÀ NỘI<br><b>BCH ĐH BÁCH KHOA HÀ NỘI</b><br><b>***</b></td>
@@ -2463,7 +2462,7 @@ async function exportDocx(){
     appAlert("Không tải được thư viện tạo file Word (cần kết nối mạng). Vui lòng kiểm tra lại kết nối mạng rồi thử lại.","Không thể xuất Word");
     return;
   }
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, convertInchesToTwip, VerticalAlign, UnderlineType, BorderStyle, HeightRule, TableLayoutType } = docx;
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, convertInchesToTwip, VerticalAlign, UnderlineType, BorderStyle, TableLayoutType } = docx;
 
   const p = state.personal;
   const mssvCheck = validateMSSV(p.mssv);
@@ -2530,13 +2529,10 @@ async function exportDocx(){
     return mkCell([Ppar([T(text, {bold:true})], {alignment:AlignmentType.CENTER})], cotIndex);
   }
 
-  // ---- Khối tiêu đề: MỘT bảng 3 cột không viền (ảnh 4x6 | tên tổ chức | HSV VN).
-  //      Trước đây dùng 3 khung nổi neo tuyệt đối; Word đọc đúng nhưng Google Docs
-  //      không hỗ trợ khung nổi nên khi mở trên Drive cả 3 khối rơi xuống xếp chồng
-  //      dọc. Bảng thì Word và Google Docs dựng giống hệt nhau. ----
-  const CM_TWIP = 566.929;
-  const PHOTO_W_CM = 2.35;
-  const PHOTO_H_CM = 3.05;
+  // ---- Khối tiêu đề: MỘT bảng 2 cột không viền (tên tổ chức | HSV Việt Nam),
+  //      chia 60/40 đúng như bản xem trước trên web. Dùng bảng thay vì khung nổi
+  //      neo tuyệt đối: Word đọc được khung nổi nhưng Google Docs thì không, mở
+  //      trên Drive là hai khối rơi xuống xếp chồng dọc. ----
   const PAGE_CONTENT_WIDTH = convertInchesToTwip(11.69) - 720 - 720; // khổ ngang trừ lề
 
   // Google Docs bỏ qua chiều rộng dạng phần trăm khi nhập .docx rồi co bảng về bề
@@ -2550,10 +2546,8 @@ async function exportDocx(){
     return w;
   })();
 
-  const photoWidthTwip = Math.round(PHOTO_W_CM * CM_TWIP);
-  const headerHeightTwip = Math.round(PHOTO_H_CM * CM_TWIP);
-  const orgTextWidth = Math.round((PAGE_CONTENT_WIDTH - photoWidthTwip) * 0.52);
-  const hsvWidth = PAGE_CONTENT_WIDTH - photoWidthTwip - orgTextWidth;
+  const orgTextWidth = Math.round(PAGE_CONTENT_WIDTH * 0.6);
+  const hsvWidth = PAGE_CONTENT_WIDTH - orgTextWidth;
 
   const KHONG_VIEN = {
     top:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
@@ -2563,27 +2557,13 @@ async function exportDocx(){
     insideHorizontal:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
     insideVertical:{style:BorderStyle.NONE, size:0, color:"FFFFFF"}
   };
-  const VIEN_DEN = {
-    top:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-    bottom:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-    left:{style:BorderStyle.SINGLE, size:4, color:"000000"},
-    right:{style:BorderStyle.SINGLE, size:4, color:"000000"}
-  };
-
   const headerTable = new Table({
     width:{size: PAGE_CONTENT_WIDTH, type: WidthType.DXA},
-    columnWidths: [photoWidthTwip, orgTextWidth, hsvWidth],
+    columnWidths: [orgTextWidth, hsvWidth],
     layout: TableLayoutType.FIXED,
     borders: KHONG_VIEN,
     rows:[ new TableRow({
-      height:{ value: headerHeightTwip, rule: HeightRule.ATLEAST },
       children:[
-        new TableCell({
-          width:{size: photoWidthTwip, type: WidthType.DXA},
-          borders: VIEN_DEN,
-          verticalAlign: VerticalAlign.CENTER,
-          children:[ Ppar([T("Ảnh 4x6", {bold:true})], {alignment:AlignmentType.CENTER, spacing:{before:0,after:0}}) ]
-        }),
         new TableCell({
           width:{size: orgTextWidth, type: WidthType.DXA},
           verticalAlign: VerticalAlign.TOP,
