@@ -68,7 +68,7 @@ async function exportDocx(){
   function mkCell(children, cotIndex, opts){
     return new TableCell(Object.assign({
       width:{size: COT_RONG[cotIndex], type: WidthType.DXA},
-      margins:{top:60, bottom:60, left:120, right:100},
+      margins:{top:40, bottom:40, left:120, right:100},
       children: children.length ? children : [Ppar([T("")])]
     }, opts||{}));
   }
@@ -151,7 +151,7 @@ async function exportDocx(){
   });
 
   const thanhTichRow = new TableRow({children:[
-    new TableCell({columnSpan:7, width:{size:PAGE_CONTENT_WIDTH, type:WidthType.DXA}, margins:{top:60,bottom:60,left:120,right:100}, children:[
+    new TableCell({columnSpan:7, width:{size:PAGE_CONTENT_WIDTH, type:WidthType.DXA}, margins:{top:40,bottom:40,left:120,right:100}, children:[
       Ppar([T("THÀNH TÍCH", {bold:true, size:20})], {alignment:AlignmentType.CENTER})
     ]})
   ]});
@@ -212,7 +212,9 @@ async function exportDocx(){
             width: convertInchesToTwip(8.27),
             height: convertInchesToTwip(11.69)
           },
-          margin:{ top:720, bottom:720, left:720, right:720 }
+          // Lề trên/dưới 1cm thay vì 1,27cm để khối xác nhận nằm cùng trang với
+          // bảng. Lề trái/phải giữ nguyên.
+          margin:{ top:567, bottom:567, left:720, right:720 }
         }
       },
       children:[
@@ -226,7 +228,7 @@ async function exportDocx(){
         Ppar([T("NĂM " + REPORT_YEAR, {bold:true, size:28})], {alignment:AlignmentType.CENTER, spacing:{before:0, after:0}}),
         Dem(100),
         mainTable,
-        Dem(140),
+        Dem(60),
         confirmTable,
         // Sau một bảng ở cuối thân tài liệu, trình đọc luôn cần một đoạn văn.
         // Tự đặt đoạn mỏng để không bị thêm một đoạn cỡ chữ thường đẩy sang trang mới.
