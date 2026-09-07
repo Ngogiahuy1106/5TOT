@@ -17,6 +17,9 @@ async function exportDocx(){
   const FONT = "Times New Roman";
   const T = (text, opts) => new TextRun(Object.assign({text, font:FONT, size:20}, opts||{}));
   const Ppar = (children, opts) => new Paragraph(Object.assign({children}, opts||{}));
+  // Đoạn đệm mỏng: cỡ chữ 1pt nên gần như không chiếm chiều cao, khoảng cách do
+  // spacing quyết định. Dùng thay đoạn trống cỡ chữ thường để báo cáo vừa một trang.
+  const Dem = (after) => Ppar([T("", {size:2})], {spacing:{before:0, after}});
 
   function cellParagraphs(lines){
     return lines.map(l => {
@@ -213,15 +216,21 @@ async function exportDocx(){
         }
       },
       children:[
+        // Google Docs tự chèn một đoạn trống cỡ 11pt khi thân tài liệu mở đầu
+        // bằng bảng. Tự đặt sẵn một đoạn mỏng ở đây để nó không chèn nữa.
+        Dem(0),
         headerTable,
-        Ppar([T("")]),
-        Ppar([T("BÁO CÁO THÀNH TÍCH", {bold:true, size:32})], {alignment:AlignmentType.CENTER}),
-        Ppar([T("ĐỀ NGHỊ CÔNG NHẬN DANH HIỆU SINH VIÊN 5 TỐT CẤP ĐẠI HỌC", {bold:true, size:28})], {alignment:AlignmentType.CENTER}),
-        Ppar([T("NĂM " + REPORT_YEAR, {bold:true, size:28})], {alignment:AlignmentType.CENTER}),
-        Ppar([T("")]),
+        Dem(120),
+        Ppar([T("BÁO CÁO THÀNH TÍCH", {bold:true, size:32})], {alignment:AlignmentType.CENTER, spacing:{before:0, after:0}}),
+        Ppar([T("ĐỀ NGHỊ CÔNG NHẬN DANH HIỆU SINH VIÊN 5 TỐT CẤP ĐẠI HỌC", {bold:true, size:28})], {alignment:AlignmentType.CENTER, spacing:{before:0, after:0}}),
+        Ppar([T("NĂM " + REPORT_YEAR, {bold:true, size:28})], {alignment:AlignmentType.CENTER, spacing:{before:0, after:0}}),
+        Dem(100),
         mainTable,
-        Ppar([T("")]),
-        confirmTable
+        Dem(140),
+        confirmTable,
+        // Sau một bảng ở cuối thân tài liệu, trình đọc luôn cần một đoạn văn.
+        // Tự đặt đoạn mỏng để không bị thêm một đoạn cỡ chữ thường đẩy sang trang mới.
+        Dem(0)
       ]
     }]
   });
