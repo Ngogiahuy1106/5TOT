@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TestXuatBaoCao - thử riêng phần xuất file Word</title>
+<style>
+  :root{
+    --navy:#0b2f56; --navy-dark:#071f3d; --bg:#f3f5f8; --card:#fff;
+    --border:#d8dde3; --text:#1c2733; --muted:#5b6b7a;
+    --ok:#1e7d4b; --ok-bg:#e6f4ec; --err:#b3261e; --err-bg:#fdecea;
+    --warn:#8a6210; --warn-bg:#fbf3de;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",Arial,sans-serif;line-height:1.6}
+  header{background:var(--navy);color:#fff;padding:20px 24px}
+  header h1{margin:0;font-size:19px;font-weight:600}
+  header p{margin:4px 0 0;font-size:13px;color:#c7d5e6}
+  .wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:17px;color:var(--navy-dark)}
+  .card .sub{margin:0 0 16px;font-size:13px;color:var(--muted)}
+  .btn{padding:12px 22px;border-radius:7px;font-size:15px;font-weight:600;border:none;cursor:pointer;background:var(--navy);color:#fff}
+  .btn:hover{background:var(--navy-dark)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  #ketQua{font-size:13px;font-weight:600;margin-top:12px;min-height:20px}
+  #ketQua.ok{color:var(--ok)}
+  #ketQua.loi{color:var(--err)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#eef2f6;color:var(--navy-dark);font-size:12px}
+  .green{color:var(--ok);font-weight:600}
+  .red{color:var(--err);font-weight:600}
+  .plain{color:var(--muted)}
+  ul{margin:8px 0 0;padding-left:20px}
+  li{margin-bottom:6px;font-size:14px}
+  code{background:#eef2f6;padding:1px 5px;border-radius:3px;font-size:12.5px}
+  .note{background:var(--warn-bg);border:1px solid #e0c77d;border-radius:7px;padding:12px 14px;font-size:13.5px;color:#5c4708}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TestXuatBaoCao</h1>
+  <p>Chạy riêng phần xuất file Word của báo cáo thành tích, với dữ liệu mẫu cố định</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Xuất file</h2>
+    <p class="sub">Dùng đúng mã đang chạy thật, chép từ <code>public/js/app.js</code> sang <code>xuat-bao-cao.js</code>. Không cần chạy máy chủ, không cần điền biểu mẫu.</p>
+    <div class="row">
+      <button class="btn" id="nutXuat">Xuất file Word (.docx)</button>
+      <span class="sub" style="margin:0">Tên file: <code>Nguyễn Mai Trang_5tot.docx</code></span>
+    </div>
+    <div id="ketQua"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cần soi kỹ sau khi mở bằng Google Docs</h2>
+    <p class="sub">Dữ liệu mẫu bên dưới được dựng để chạm vào đúng những chỗ hay vỡ.</p>
+    <ul>
+      <li><b>Khối tên tổ chức ở đầu trang</b> dùng khung nổi (frame) đặt tuyệt đối. Word hiểu đúng, còn Google Docs thường không giữ khung nổi - đây là chỗ đáng ngờ nhất.</li>
+      <li><b>Khổ ngang</b> (landscape) có giữ được không.</li>
+      <li><b>Ô "Ảnh 4x6"</b> ở góc trên bên trái có nằm đúng chỗ không.</li>
+      <li><b>Dòng phụ không đánh số</b> (<code>plain: true</code>) như "+ Kỳ 1: 93" - phải không bị đánh số theo.</li>
+      <li><b>Chữ màu</b> xanh lá và đỏ có giữ nguyên không.</li>
+      <li><b>Dấu ngoặc cong</b> “ ” và dấu tiếng Việt có bị vỡ font không.</li>
+      <li><b>Chiều rộng 7 cột</b> và chỗ xuống dòng của các câu dài.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Dữ liệu mẫu đang dùng</h2>
+    <p class="sub">Sửa trong <code>du-lieu-mau.js</code> nếu muốn thử nội dung khác.</p>
+    <table id="bangMau"><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Sửa xong thì chép ngược lại</h2>
+    <div class="note">
+      <code>xuat-bao-cao.js</code> là bản sao. Sửa ở đây <b>không</b> ảnh hưởng tới trang thật.
+      Khi ưng rồi, chép phần đã sửa đè lại vào <code>public/js/app.js</code> đúng khối
+      <code>/* ---------- Xuất Word (.docx) ... */</code>, rồi chạy <code>npm test</code>.
+      Đầu file <code>xuat-bao-cao.js</code> có ghi commit gốc để đối chiếu.
+    </div>
+  </div>
+
+</div>
+
+<script src="../public/vendor/docx-8.5.0.umd.js"></script>
+<script src="du-lieu-mau.js"></script>
+<script src="xuat-bao-cao.js"></script>
+<script>
+  const COT = [
+    ["Đạo đức", getDaoDucLines()],
+    ["Học tập", getHocTapLines()],
+    ["Thể lực", getTheLucLines()],
+    ["Tình nguyện", getTinhNguyenLines()],
+    ["Hội nhập", getHoiNhapLines()],
+    ["Thành tích khác", getSimpleLines()],
+  ];
+  const tbody = document.querySelector("#bangMau tbody");
+  tbody.innerHTML = "<tr><th>Cột</th><th>Các dòng sẽ in ra</th></tr>" + COT.map(([ten, dong]) => {
+    const noiDung = dong.map(d => {
+      const lop = d.color === "green" ? "green" : d.color === "red" ? "red" : d.plain ? "plain" : "";
+      const nhan = d.plain ? "" : "• ";
+      return `<div class="${lop}">${nhan}${d.text.replace(/[<>]/g, "")}</div>`;
+    }).join("");
+    return `<tr><td style="width:150px"><b>${ten}</b></td><td>${noiDung}</td></tr>`;
+  }).join("");
+
+  const ketQua = document.getElementById("ketQua");
+  document.getElementById("nutXuat").onclick = async () => {
+    ketQua.className = "";
+    ketQua.textContent = "Đang dựng file...";
+    try {
+      await exportDocx();
+      ketQua.className = "ok";
+      ketQua.textContent = "Đã dựng xong. Kiểm tra thư mục Tải xuống của trình duyệt.";
+    } catch (err) {
+      ketQua.className = "loi";
+      ketQua.textContent = "Lỗi: " + (err && err.message ? err.message : err);
+      console.error(err);
+    }
+  };
+</script>
+
+</body>
+</html>
