@@ -332,9 +332,14 @@ function linkFieldLabels(root){
   });
 }
 
+// renderMinhChung() bị gọi lại mỗi lần tick một ô ở bước 8, nên popup hoạt động
+// đề xuất phải bắt đúng lúc chuyển vào bước đó chứ không đặt trong renderMinhChung.
+let _lastRenderedStepKey = null;
 function render(){
   renderSteps();
   const key = STEPS[state.step].key;
+  const vuaVaoMinhChung = key === "minhChung" && _lastRenderedStepKey !== "minhChung";
+  _lastRenderedStepKey = key;
   if(key === "personal") renderPersonal();
   else if(key === "daoDuc") renderDaoDuc();
   else if(key === "hocTap") renderHocTap();
@@ -346,6 +351,7 @@ function render(){
   else if(key === "preview") renderPreview();
   linkFieldLabels(contentEl);
   window.scrollTo(0,0);
+  if(vuaVaoMinhChung) maybeAutoOpenProposedDialog();
 }
 
 function navButtons(onNext, nextLabel){
@@ -2048,15 +2054,65 @@ async function openSubmissionReviewDialog(){
   });
 }
 
+function openProposedActivitiesDialog(){
+  const list=collectProposedActivities(allCriterionGroupSources());
+  const linkHost=document.getElementById("proposedDialogLink");
+  const tableHost=document.getElementById("proposedDialogTable");
+  const panel=document.getElementById("proposedDialog");
+  if(!linkHost || !tableHost || !panel) return;
+  const url=APP_CONFIG.linkDeXuatHoatDong;
+  if(isValidHttpsUrl(url)){
+    linkHost.innerHTML=`<a href="${escapeHtmlAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+  } else {
+    linkHost.textContent="Ban chưa cấu hình link đề xuất hoạt động.";
+  }
+  tableHost.innerHTML=list.length
+    ? `<table class="dialog-issue-table"><thead><tr><th>STT</th><th>Tiêu chí</th><th>Hoạt động đề xuất</th></tr></thead><tbody>${
+        list.map((x,i)=>`<tr><td class="issue-row">${i+1}</td><td><b>${escapeHtml(x.section)}</b><div class="hint">${escapeHtml(x.criterion)}</div></td><td>${escapeHtml(x.name)}</td></tr>`).join("")
+      }</tbody></table>`
+    : "";
+  tableHost.style.display=list.length?"":"none";
+  closeAllModalPanels();
+  panel.style.display="block";
+  document.getElementById("modalOverlay").style.display="flex";
+}
+
+// Tự bật một lần cho mỗi danh sách đề xuất: quay lại bước 8 mà danh sách không đổi
+// thì thôi, vẫn mở lại được bằng nút ngay trong bước 8.
+let _proposedDialogShownFor = null;
+function maybeAutoOpenProposedDialog(){
+  if(window._adminReviewSubmission) return;
+  const list=collectProposedActivities(allCriterionGroupSources());
+  if(!list.length) return;
+  const dau=list.map(x=>x.section+"|"+x.name).join("\n");
+  if(dau===_proposedDialogShownFor) return;
+  if(document.getElementById("appDialog")?.style.display==="block") return;
+  _proposedDialogShownFor=dau;
+  openProposedActivitiesDialog();
+}
+
 function renderMinhChung(){
   contentEl.innerHTML = `
     <div class="card">
       <h2>Minh chứng hoạt động</h2>
       <p class="sub">Đánh dấu các hoạt động đã chuẩn bị xong ảnh/giấy tờ minh chứng, dùng để đối chiếu khi nộp minh chứng qua drive.</p>
+      <div id="proposedNoticeHost"></div>
       <div class="evidence-grid" id="evidenceGrid"></div>
     </div>
   `;
   const grid = document.getElementById("evidenceGrid");
+  const proposedList = collectProposedActivities(allCriterionGroupSources());
+  if(proposedList.length){
+    const host = document.getElementById("proposedNoticeHost");
+    host.className = "evidence-form-link proposed-notice";
+    host.innerHTML = `<span>Bạn có ${proposedList.length} hoạt động tự đề xuất cần gửi Ban xét duyệt.</span>`;
+    const reopen = document.createElement("button");
+    reopen.type = "button";
+    reopen.className = "btn btn-secondary btn-small";
+    reopen.textContent = "Xem danh sách và link đề xuất";
+    reopen.onclick = openProposedActivitiesDialog;
+    host.appendChild(reopen);
+  }
 
   EVIDENCE_CARDS.forEach(cardDef => {
     const items = cardDef.getItems();
@@ -2849,12 +2905,30 @@ function findActivityUsedInOtherGroup(name,currentGroupId,groupSources){
 // Hội nhập có hai rổ tách biệt: nhóm chính (fixed) và nhóm phụ.
 function allCriterionGroupSources(){
   return [
-    {list:GROUPS.daoDuc.list, states:state.daoDuc.groups},
-    {list:GROUPS.hocTap.list, states:state.hocTap.groups},
-    {list:GROUPS.theLuc.list, states:state.theLuc.groups},
-    {list:HOINHAP_FIXED,      states:state.hoiNhap.fixed},
-    {list:GROUPS.hoiNhap.list,states:state.hoiNhap.groups}
+    {section:"Đạo đức",  list:GROUPS.daoDuc.list, states:state.daoDuc.groups},
+    {section:"Học tập",  list:GROUPS.hocTap.list, states:state.hocTap.groups},
+    {section:"Thể lực",  list:GROUPS.theLuc.list, states:state.theLuc.groups},
+    {section:"Hội nhập", list:HOINHAP_FIXED,      states:state.hoiNhap.fixed},
+    {section:"Hội nhập", list:GROUPS.hoiNhap.list,states:state.hoiNhap.groups}
   ];
+}
+
+// Hoạt động sinh viên tự đề xuất còn được dùng để xét tiêu chí - đúng những dòng in
+// màu xanh trong báo cáo. Nhóm đang "bổ sung sau" hoặc "Không đạt" không in hoạt
+// động nên cũng bỏ. Tình nguyện không tính: ở đó là "tự nhập", khác với đề xuất.
+function collectProposedActivities(groupSources){
+  const out=[];
+  for(const source of groupSources||[]){
+    for(const def of source?.list||[]){
+      const gs=(source.states||{})[def.id];
+      if(!gs || gs.pending===true || gs.notMet===true || gs.yes===false) continue;
+      for(const item of (Array.isArray(gs.items)?gs.items:[])){
+        const name=String(item?.name||"").trim();
+        if(item?.proposed===true && name) out.push({section:source.section||"", criterion:def.label||"", name});
+      }
+    }
+  }
+  return out;
 }
 
 function warnActivityAlreadyUsed(name,used){

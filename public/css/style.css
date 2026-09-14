@@ -807,3 +807,8 @@ body.admin-review-mode #stepContent .tn-chip-remove{display:none!important}
   select,
   textarea{font-size:16px}
 }
+
+/* ---- Nhắc hoạt động tự đề xuất ở bước Minh chứng ---- */
+.proposed-notice{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.proposed-notice span{font-weight:600;color:var(--navy-dark)}
+#proposedDialogTable .hint{margin-top:2px}

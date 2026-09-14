@@ -126,14 +126,14 @@ function setAdminButtonsVisible(visible){
 }
 
 function closeAllModalPanels(){
-  ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog"].forEach(id => {
+  ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog"].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = "none";
   });
 }
 
 function hideOverlayIfEmpty(){
-  const anyOpen = ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog"].some(id => {
+  const anyOpen = ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog"].some(id => {
     const el = document.getElementById(id);
     return el && el.style.display === "block";
   });
@@ -864,6 +864,8 @@ function initAdminUI(){
   document.getElementById("closeImagePreviewBtn").onclick = closeImagePreview;
   document.getElementById("appDialogConfirm").onclick = () => finishAppDialog(true);
   document.getElementById("appDialogCancel").onclick = () => finishAppDialog(false);
+  const proposedClose = document.getElementById("proposedDialogClose");
+  if(proposedClose) proposedClose.onclick = () => { document.getElementById("proposedDialog").style.display = "none"; hideOverlayIfEmpty(); };
   document.getElementById("deletePasswordCancel").onclick = closeDeletePasswordModal;
   document.getElementById("deletePasswordConfirm").onclick = confirmDeleteSubmission;
   document.getElementById("deletePasswordInput").addEventListener("keydown",e => { if(e.key === "Enter") confirmDeleteSubmission(); });
