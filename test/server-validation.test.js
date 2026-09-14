@@ -114,7 +114,7 @@ test('rate limit tách khóa: gửi hồ sơ theo MSSV, đăng nhập chỉ đ�
   // Đăng nhập không còn dùng middleware đếm mọi request.
   assert.doesNotMatch(source,/const authLimit=/);
   assert.match(source,/app\.post\('\/api\/auth',async\(req,res\)=>/);
-  assert.match(source,/Chỉ lần SAI mới bị tính vào hạn mức/);
+  assert.match(source,/if\(!checkAdminPassword\(req\.body\?\.password\)\)\{[\s\S]{0,200}?touchRateLimit\(failKey,AUTH_FAIL_WINDOW_MS\)/);
   // express.json phải chạy trước limiter vì limiter đọc req.body.mssv.
   assert.ok(source.indexOf("app.use(express.json(")<source.indexOf("app.use('/api',globalApiLimit)"),
     'express.json phải đăng ký trước globalApiLimit');
