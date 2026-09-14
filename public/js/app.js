@@ -2105,7 +2105,7 @@ function renderMinhChung(){
   if(proposedList.length){
     const host = document.getElementById("proposedNoticeHost");
     host.className = "evidence-form-link proposed-notice";
-    host.innerHTML = `<span>Bạn có ${proposedList.length} hoạt động tự đề xuất cần gửi Ban xét duyệt.</span>`;
+    host.innerHTML = `<span>Bạn có ${proposedList.length} hoạt động tự đề xuất cần điền vào link.</span>`;
     const reopen = document.createElement("button");
     reopen.type = "button";
     reopen.className = "btn btn-secondary btn-small";
