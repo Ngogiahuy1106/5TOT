@@ -16,12 +16,10 @@
     </div>
     <div class="no-print header-actions">
       <button id="fillSampleBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Điền dữ liệu mẫu (Nguyễn Văn A)</button>
-      <button id="importExcelBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Nhập Excel hoạt động</button>
-      <button id="exportExcelBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Xuất Excel hoạt động</button>
+      <button id="manageActivitiesBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Quản lý hoạt động</button>
       <button id="adminConfigBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Cấu hình</button>
       <button id="lookupSubmissionBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff">Tra cứu hồ sơ</button>
       <button id="adminSubmissionsBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff; display:none">Hồ sơ đã gửi</button>
-      <input type="file" id="importExcelInput" accept=".xlsx,.xls" style="display:none">
       <button id="adminLoginBtn" class="btn btn-secondary" style="white-space:nowrap; background:#fff">Quản trị</button>
     </div>
   </div>
@@ -121,6 +119,27 @@
       <span id="submissionPageInfo">Trang 1/1</span>
       <button id="submissionNextPage" class="btn btn-secondary btn-small" type="button">Trang sau</button>
     </div>
+  </div>
+
+  <div id="activityManagerModal" class="modal-box modal-box-admin activity-manager" style="display:none">
+    <div class="modal-heading-row">
+      <div>
+        <h3>Quản lý hoạt động</h3>
+        <p class="modal-sub">Danh mục hoạt động sinh viên chọn khi khai hồ sơ, xếp theo từng tiêu chí. Thêm, sửa hoặc xóa ở đây được lưu ngay lên hệ thống.</p>
+      </div>
+      <button id="closeActivityManagerBtn" class="modal-close-btn" type="button">Đóng</button>
+    </div>
+    <div id="activityManagerStats" class="activity-stats"></div>
+    <div class="admin-toolbar activity-toolbar">
+      <input type="text" id="activitySearchInput" class="modal-input" aria-label="Tìm hoạt động" placeholder="Tìm theo tên hoạt động, yêu cầu, minh chứng hoặc mã">
+      <button id="importExcelBtn" class="btn btn-secondary" type="button">Nhập Excel</button>
+      <button id="exportExcelBtn" class="btn btn-secondary" type="button">Xuất Excel</button>
+      <button id="addActivityBtn" class="btn btn-primary" type="button">+ Thêm hoạt động</button>
+      <input type="file" id="importExcelInput" accept=".xlsx,.xls" style="display:none">
+    </div>
+    <div id="activityManagerMessage"></div>
+    <div id="activityForm" class="activity-form" style="display:none"></div>
+    <div id="activityManagerList" class="activity-manager-list"></div>
   </div>
 
   <div id="imagePreviewModal" class="modal-box modal-box-image" style="display:none">

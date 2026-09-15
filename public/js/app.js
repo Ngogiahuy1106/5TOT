@@ -2743,74 +2743,122 @@ async function exportDocx(){
 // (window.beforeunload được gắn trong main.js)
 
 /* =========================================================
-   7. DỮ LIỆU MẪU - điền nhanh để test/demo
+   7. DỮ LIỆU MẪU - hồ sơ Nguyễn Văn A khai đủ mọi phần và gửi được
    ========================================================= */
+// Chọn hoạt động theo tên chứ không theo vị trí trong danh mục: cùng một hoạt
+// động có thể nằm ở hai tiêu chí, lấy mù phần tử đầu thì máy chủ sẽ từ chối vì
+// dùng một hoạt động cho hai tiêu chí. Nhóm chưa có danh mục thì dùng hoạt động
+// đề xuất để hồ sơ mẫu vẫn đủ số lượng.
 function fillSampleData(){
-  const sampleItem=(key,index,fallback)=>CRITERIA[key]?.[index]
-    ? {...CRITERIA[key][index]}
-    : {id:newStableId("sample"),name:fallback,yeuCau:"Dữ liệu minh họa",minhchung:"Minh chứng minh họa",proposed:true};
+  const normalizeName=window.SV5TRules.normalizeActivityName;
+  const usedNames=new Set();
+  const pick=(key,count,fallbackNames)=>{
+    const out=[];
+    const take=(name,build)=>{
+      const nameKey=normalizeName(name);
+      if(out.length>=count||!nameKey||usedNames.has(nameKey)) return;
+      usedNames.add(nameKey);
+      out.push(build());
+    };
+    (CRITERIA[key]||[]).forEach(item=>take(item.name,()=>({id:item.id,name:item.name,yeuCau:item.yeuCau||"",minhchung:item.minhchung||""})));
+    fallbackNames.forEach(name=>take(name,()=>({id:newStableId("proposed"),name,proposed:true})));
+    return out;
+  };
+  const listGroup=items=>({yes:true,pending:false,items});
+  const notMetList={yes:false,notMet:true,pending:false,items:[]};
+  const namHoc=`${REPORT_YEAR-1}-${REPORT_YEAR}`;
+  const today=new Date();
+
   state.personal = {
     fullName:"Nguyễn Văn A", gender:"Nam", birthYear:"2006", ethnicity:"Kinh", mssv:"202414918",
-    className:"ET1 01 - K69", khoaTruong:"Điện - Điện tử",
+    className:"Điện tử 01 - K69", khoaTruong:"Điện - Điện tử",
     positions:["Ủy viên Ban Chấp hành Chi đoàn, Chi hội lớp"],
-    partyStatus:"Đoàn viên", phone:"0904xxxxxx"
+    partyStatus:"Đoàn viên", phone:"0904123456"
   };
-  state.reportDate = { day:"", month:"", year: String(new Date().getFullYear()) };
+  state.reportDate = { day:String(today.getDate()), month:String(today.getMonth()+1), year:String(today.getFullYear()) };
   state.daoDuc = {
-    renLuyenKy1:"96", renLuyenKy2:"96",
+    renLuyenKy1:"92", renLuyenKy2:"95",
     khongViPham:true,
     groups: {
-      "DD-G1": {yes:true,pending:false,items:[
-        sampleItem("daoDuc",0,"Hoạt động Đạo đức minh họa")
-      ]},
+      "DD-G1": listGroup(pick("daoDuc",1,["Tham gia Cuộc thi tìm hiểu tư tưởng Hồ Chí Minh cấp Đại học"])),
       "DD-G2": {yes:false,pending:false,rank:""},
-      "DD-G3": {yes:false,pending:false,rank:""},
-      "DD-G4": {yes:false,pending:false,items:[]},
-      "DD-G5": {yes:false,pending:false,detail:""}
+      "DD-G3": {yes:true,pending:false,rank:"Giỏi"},
+      "DD-G4": listGroup(pick("daoDucDangDoan",1,["Tham gia Cuộc thi tìm hiểu lịch sử Đoàn TNCS Hồ Chí Minh"])),
+      "DD-G5": {yes:true,pending:false,detail:"hành động nhặt được của rơi trả lại người đánh mất tại khu ký túc xá"}
     }
   };
   state.hocTap = {
-    dien:"thuong", diemKy1:"3.38", tinChiKy1:"13", diemKy2:"3.37", tinChiKy2:"13",
+    dien:"canBoDoan", diemKy1:"3.38", tinChiKy1:"18", diemKy2:"3.45", tinChiKy2:"20",
     groups: {
-      "HT-G1": {yes:false,pending:false,detail:""},
-      "HT-G2": {yes:false,pending:false,detail:""},
-      "HT-G3": {yes:true,pending:false,items:[sampleItem("hocTap",0,"Hoạt động Học tập minh họa")]},
-      "HT-G4": {yes:false,pending:false,detail:""},
-      "HT-G5": {yes:false,pending:false,detail:""},
-      "HT-G6": {yes:false,pending:false,detail:""}
+      "HT-G1": listGroup(pick("hocTapClb",1,["Thành viên Ban Chuyên môn CLB Học thuật Điện tử"])),
+      "HT-G2": listGroup(pick("hocTapNckh",1,["Tham gia đề tài Nghiên cứu khoa học sinh viên cấp Trường"])),
+      "HT-G3": listGroup(pick("hocTap",1,["Tham gia Kỳ thi Olympic Vật lý sinh viên cấp Đại học"])),
+      "HT-G4": listGroup(pick("hocTapNhomNckh",1,["Thành viên nhóm nghiên cứu khoa học của Trường Điện - Điện tử"])),
+      "HT-G5": {...notMetList,items:[]},
+      "HT-G6": {...notMetList,items:[]}
     }
   };
   state.theLuc = {
     hoanThanhDuGDTC:false, khongDiemF:true,
     groups: {
-      "TL-G1": {yes:false,pending:false,detail:""},
-      "TL-G2": {yes:true,pending:false,items:[
-        sampleItem("theLuc",0,"Hoạt động Thể lực minh họa 1"),
-        sampleItem("theLuc",1,"Hoạt động Thể lực minh họa 2")
-      ]},
+      "TL-G1": {yes:true,pending:false,detail:`Đạt danh hiệu “Sinh viên khỏe” cấp Đại học năm học ${namHoc}`},
+      "TL-G2": listGroup(pick("theLuc",2,["Tham gia Giải chạy Bách khoa Run","Tham gia Giải bóng đá sinh viên Trường Điện - Điện tử"])),
       "TL-G3": {yes:false,pending:false,detail:""},
-      "TL-G4": {yes:false,pending:false,detail:""}
+      "TL-G4": {yes:true,pending:false,detail:"Thành viên tích cực CLB Cầu lông Bách khoa"}
     }
   };
+  // Tình nguyện so trùng riêng trong mục của nó nên không dùng chung usedNames.
+  const tnCatalog=CRITERIA.tinhNguyen||[];
+  const tnItem=(index,fallback,days,dates)=>{
+    const official=tnCatalog[index];
+    return official
+      ? {id:official.id,text:official.name,days,dates,yeuCau:official.yeuCau||"",minhchung:official.minhchung||""}
+      : {id:newStableId("tn"),text:fallback,days,dates,proposed:true};
+  };
+  const y=REPORT_YEAR-1;
   state.tinhNguyen = {
-    items:[{id:newStableId('tn'),text:"Hoạt động tình nguyện minh họa",days:5,dates:["2025-10-19","2025-10-24","2025-10-26","2025-10-31","2025-11-02"],proposed:true}],
+    items:[
+      tnItem(0,"Tham gia Chương trình hiến máu tình nguyện “Chủ Nhật Đỏ”",2,[`${y}-10-19`,`${y}-10-26`]),
+      tnItem(1,"Tham gia đội hình tình nguyện hỗ trợ tân sinh viên nhập học",3,[`${y}-11-02`,`${y}-11-09`,`${y}-11-16`])
+    ],
     pending:false,khenThuong:false,proposeOpen:false
   };
   state.hoiNhap = {
     fixed: {
-      "HN-KHOA-HOC": {yes:true,items:[sampleItem("hoiNhapKhoaHoc",0,"Khóa kỹ năng minh họa")],pending:false},
-      "HN-CAP-DAI-HOC": {yes:true,items:[sampleItem("hoiNhapCapDaiHoc",0,"Hoạt động hội nhập minh họa")],pending:false}
+      "HN-KHOA-HOC": listGroup(pick("hoiNhapKhoaHoc",1,["Tham gia Khóa kỹ năng mềm cho sinh viên"])),
+      "HN-CAP-DAI-HOC": listGroup(pick("hoiNhapCapDaiHoc",1,["Tham gia Cuộc thi Tiếng Anh cấp Đại học"]))
     },
-    ngoaiNguMethod: "certificate",
+    ngoaiNguMethod:"certificate",
     ngoaiNguCertificateType:"TOEIC",
+    ngoaiNguCertificateName:"",
     ngoaiNguCertificateScore:"650",
+    ngoaiNguCertificateDetails:{},
     ngoaiNguPending:false,
     groups: {
-      "HN-G1": {yes:false,pending:false,items:[]},
-      "HN-G2": {yes:true,pending:false,items:[sampleItem("hoiNhapPhu",0,"Cuộc thi hội nhập minh họa")]}
+      "HN-G1": listGroup(pick("hoiNhapGiaoLuu",1,["Tham gia Chương trình giao lưu sinh viên quốc tế"])),
+      "HN-G2": listGroup(pick("hoiNhapPhu",1,["Tham gia Cuộc thi hùng biện tiếng Anh cấp Trường"]))
     }
   };
-  state.khac = { items:[{id:newStableId('khac'),text:"Đạt học bổng KKHT loại B kỳ 2024.1"}] };
+  state.khac = { items:[
+    {id:newStableId("khac"),text:`Đạt học bổng Khuyến khích học tập loại B kỳ ${y}.1`},
+    {id:newStableId("khac"),text:`Giấy khen Cán bộ Đoàn tiêu biểu năm học ${namHoc}`}
+  ] };
+
+  // Minh chứng: mỗi mục nộp bằng link đơn đã cấu hình để hồ sơ không còn mục trống.
+  // Chưa cấu hình link thì để bổ sung sau - máy chủ vẫn nhận.
+  state.evidence = {};
+  state.evidenceForms = {};
+  state.evidenceImages = {};
+  state.removedEvidenceImageKeys = [];
+  state.evidenceExpanded = null;
+  EVIDENCE_CARDS.forEach(card=>{
+    const link=EVIDENCE_CARD_LINK[card.key]?.().url;
+    card.getItems().forEach(it=>{
+      const evKey=card.key+"::"+it.key;
+      if(isValidHttpsUrl(link)){ state.evidence[evKey]="form"; state.evidenceForms[evKey]=link; }
+      else state.evidence[evKey]="later";
+    });
+  });
   state.step = 0;
   render();
 }
@@ -3101,44 +3149,13 @@ function parseActivityCatalogRows(rows){
 async function exportCriteriaExcel(){
   try{ await ensureXlsx(); }
   catch(err){
-    appAlert("Không tải được thư viện Excel (cần kết nối mạng).","Không thể dùng Excel");
+    await appAlert("Không tải được thư viện Excel (cần kết nối mạng).","Không thể dùng Excel");
     return;
   }
   const rows = [["Tiêu chí", "Tiêu chí chính/phụ", "Mô tả tiêu chí cụ thể", "Mã hoạt động", "Hoạt động", "Yêu cầu", "Cách thức Minh chứng"]];
-
-  function addRows(tieuChi, loai, moTa, items){
-    if(!items.length) return;
-    items.forEach(it => rows.push([tieuChi, loai, moTa||"", it.id||"", it.name, it.yeuCau||"", it.minhchung||""]));
-  }
-
-  const ddPhuDesc = (GROUPS.daoDuc.list.find(g=>g.id==="DD-G1")||{}).label || "";
-  const ddDangDoanDesc = (GROUPS.daoDuc.list.find(g=>g.id==="DD-G4")||{}).label || "";
-  const htNckhDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G2")||{}).label || "";
-  const htPhuDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G3")||{}).label || "";
-  const htClbDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G1")||{}).label || "";
-  const htNhomDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G4")||{}).label || "";
-  const htThamLuanDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G5")||{}).label || "";
-  const htSangTaoDesc = (GROUPS.hocTap.list.find(g=>g.id==="HT-G6")||{}).label || "";
-  const tlPhuDesc = (GROUPS.theLuc.list.find(g=>g.id==="TL-G2")||{}).label || "";
-  const hnKhoaHocDesc = (HOINHAP_FIXED[0]||{}).label || "";
-  const hnCapDaiHocDesc = (HOINHAP_FIXED[1]||{}).label || "";
-  const hnGiaoLuuDesc = (GROUPS.hoiNhap.list.find(g=>g.id==="HN-G1")||{}).label || "";
-  const hnPhuDesc = (GROUPS.hoiNhap.list.find(g=>g.id==="HN-G2")||{}).label || "";
-
-  addRows("Đạo đức Tốt", "Tiêu chí phụ", ddPhuDesc, CRITERIA.daoDuc);
-  addRows("Đạo đức Tốt", "Tiêu chí phụ", ddDangDoanDesc, CRITERIA.daoDucDangDoan);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htClbDesc, CRITERIA.hocTapClb);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htNckhDesc, CRITERIA.hocTapNckh);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htPhuDesc, CRITERIA.hocTap);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htNhomDesc, CRITERIA.hocTapNhomNckh);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htThamLuanDesc, CRITERIA.hocTapThamLuan);
-  addRows("Học tập Tốt", "Tiêu chí phụ", htSangTaoDesc, CRITERIA.hocTapSangTao);
-  addRows("Thể lực Tốt", "Tiêu chí phụ", tlPhuDesc, CRITERIA.theLuc);
-  addRows("Tình nguyện Tốt", "Tiêu chí chính", "Tham gia ít nhất 05 ngày tình nguyện", CRITERIA.tinhNguyen);
-  addRows("Hội nhập Tốt", "Tiêu chí chính", hnKhoaHocDesc, CRITERIA.hoiNhapKhoaHoc);
-  addRows("Hội nhập Tốt", "Tiêu chí chính", hnCapDaiHocDesc, CRITERIA.hoiNhapCapDaiHoc);
-  addRows("Hội nhập Tốt", "Tiêu chí phụ", hnGiaoLuuDesc, CRITERIA.hoiNhapGiaoLuu);
-  addRows("Hội nhập Tốt", "Tiêu chí phụ", hnPhuDesc, CRITERIA.hoiNhapPhu);
+  activityCatalogGroups().forEach(g => {
+    CRITERIA[g.key].forEach(it => rows.push([g.section, activityKindLabel(g.kind), g.label, it.id||"", it.name, it.yeuCau||"", it.minhchung||""]));
+  });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [{wch:14},{wch:14},{wch:40},{wch:18},{wch:42},{wch:24},{wch:34}];
@@ -3148,17 +3165,19 @@ async function exportCriteriaExcel(){
 }
 
 let _activityCatalogImportRunning=false;
+// Trả về sau khi người dùng đóng thông báo kết quả, để popup Quản lý hoạt động
+// biết lúc nào mở lại.
 async function importCriteriaExcel(file){
   try{ await ensureXlsx(); }
   catch(err){
-    appAlertDetailed({
+    await appAlertDetailed({
       title:"Không dùng được chức năng Excel",
       message:"Trình duyệt chưa tải được thư viện đọc file Excel (SheetJS).",
       hint:"Thư viện này tải từ cdnjs.cloudflare.com. Hãy kiểm tra kết nối mạng hoặc tường lửa/chặn quảng cáo của máy, rồi tải lại trang."
     });
     return;
   }
-  if(_activityCatalogImportRunning){appAlert("Một file danh mục đang được xử lý. Vui lòng chờ thao tác hiện tại hoàn tất.","Đang nhập Excel");return;}
+  if(_activityCatalogImportRunning){await appAlert("Một file danh mục đang được xử lý. Vui lòng chờ thao tác hiện tại hoàn tất.","Đang nhập Excel");return;}
   _activityCatalogImportRunning=true;
   const importButton=document.getElementById("importExcelBtn");
   const previousButtonText=importButton?.textContent||"Nhập Excel hoạt động";
@@ -3166,7 +3185,7 @@ async function importCriteriaExcel(file){
   const finishImport=()=>{_activityCatalogImportRunning=false;if(importButton){importButton.disabled=false;importButton.textContent=previousButtonText;}};
 
   const reader = new FileReader();
-  reader.onload = async (e) => {
+  const handleLoad = async (e) => {
     let parsed;
     // --- Bước 1: đọc file. Lỗi ở đây là lỗi định dạng/nội dung file. ---
     try{
@@ -3239,12 +3258,377 @@ async function importCriteriaExcel(file){
       "Đã thay danh mục hoạt động"
     );
   };
-  reader.onerror=async()=>{
+  const handleError=async()=>{
     finishImport();
     await appAlertDetailed({title:"Trình duyệt không đọc được file",message:"Không đọc được file bạn vừa chọn.",hint:"Lỗi xảy ra ngay trên máy bạn. File có thể đang mở trong Excel, nằm trên ổ mạng bị ngắt, hoặc không còn quyền đọc. Hãy đóng Excel, copy file về Desktop rồi chọn lại. Danh mục cũ chưa bị thay đổi."});
   };
-  try{reader.readAsArrayBuffer(file);}
-  catch(err){finishImport();appAlertDetailed({title:"Không mở được file",message:err?.message||"Không đọc được file đã chọn.",hint:"Danh mục cũ chưa bị thay đổi."});}
+  return new Promise(resolve=>{
+    reader.onload=e=>handleLoad(e).finally(resolve);
+    reader.onerror=()=>handleError().finally(resolve);
+    try{reader.readAsArrayBuffer(file);}
+    catch(err){finishImport();appAlertDetailed({title:"Không mở được file",message:err?.message||"Không đọc được file đã chọn.",hint:"Danh mục cũ chưa bị thay đổi."}).finally(resolve);}
+  });
+}
+
+/* =========================================================
+   9. QUẢN LÝ DANH MỤC HOẠT ĐỘNG
+   Popup cho Ban xem cả danh mục theo tiêu chí và thêm, sửa, xóa lẻ từng hoạt
+   động mà không phải sửa Excel rồi nhập lại. Vẫn lưu qua
+   PUT /api/admin/activity-catalog nên máy chủ kiểm tra y như khi nhập Excel.
+   ========================================================= */
+const ACTIVITY_SECTIONS = Object.freeze(["Đạo đức Tốt","Học tập Tốt","Thể lực Tốt","Tình nguyện Tốt","Hội nhập Tốt"]);
+
+// Thứ tự, loại chính/phụ và mô tả của 14 nhóm danh mục. File Excel xuất ra dùng
+// đúng bảng này, nên mô tả phải khớp resolveActivityCatalogKey để nhập lại được.
+function activityCatalogGroups(){
+  const label=(list,id)=>(list.find(g=>g.id===id)||{}).label||"";
+  const dd=GROUPS.daoDuc.list, ht=GROUPS.hocTap.list, tl=GROUPS.theLuc.list, hn=GROUPS.hoiNhap.list;
+  return [
+    {key:"daoDuc",          section:"Đạo đức Tốt",     kind:"phu",   groupId:"DD-G1",          label:label(dd,"DD-G1")},
+    {key:"daoDucDangDoan",  section:"Đạo đức Tốt",     kind:"phu",   groupId:"DD-G4",          label:label(dd,"DD-G4")},
+    {key:"hocTapClb",       section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G1",          label:label(ht,"HT-G1")},
+    {key:"hocTapNckh",      section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G2",          label:label(ht,"HT-G2")},
+    {key:"hocTap",          section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G3",          label:label(ht,"HT-G3")},
+    {key:"hocTapNhomNckh",  section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G4",          label:label(ht,"HT-G4")},
+    {key:"hocTapThamLuan",  section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G5",          label:label(ht,"HT-G5")},
+    {key:"hocTapSangTao",   section:"Học tập Tốt",     kind:"phu",   groupId:"HT-G6",          label:label(ht,"HT-G6")},
+    {key:"theLuc",          section:"Thể lực Tốt",     kind:"phu",   groupId:"TL-G2",          label:label(tl,"TL-G2")},
+    {key:"tinhNguyen",      section:"Tình nguyện Tốt", kind:"chinh", groupId:"",               label:"Tham gia ít nhất 05 ngày tình nguyện"},
+    {key:"hoiNhapKhoaHoc",  section:"Hội nhập Tốt",    kind:"chinh", groupId:"HN-KHOA-HOC",    label:label(HOINHAP_FIXED,"HN-KHOA-HOC")},
+    {key:"hoiNhapCapDaiHoc",section:"Hội nhập Tốt",    kind:"chinh", groupId:"HN-CAP-DAI-HOC", label:label(HOINHAP_FIXED,"HN-CAP-DAI-HOC")},
+    {key:"hoiNhapGiaoLuu",  section:"Hội nhập Tốt",    kind:"phu",   groupId:"HN-G1",          label:label(hn,"HN-G1")},
+    {key:"hoiNhapPhu",      section:"Hội nhập Tốt",    kind:"phu",   groupId:"HN-G2",          label:label(hn,"HN-G2")}
+  ];
+}
+function activityKindLabel(kind){ return kind==="chinh" ? "Tiêu chí chính" : "Tiêu chí phụ"; }
+function activityGroupName(g){ return g.groupId ? `${g.section} - ${g.groupId}` : g.section; }
+
+// Cùng giới hạn với parseActivityCatalogRows và route lưu danh mục trên máy chủ.
+function validateActivityEntry(entry){
+  if(!entry.name) return "Vui lòng nhập tên hoạt động.";
+  const tooLong=[["Tên hoạt động",entry.name,500],["Yêu cầu",entry.yeuCau,500],["Cách thức minh chứng",entry.minhchung,1000]]
+    .find(([,value,limit])=>value.length>limit);
+  if(tooLong) return `${tooLong[0]} dài ${tooLong[1].length} ký tự, vượt giới hạn ${tooLong[2]} ký tự.`;
+  if([entry.name,entry.yeuCau,entry.minhchung].some(value=>/[<>]/.test(value))) return "Nội dung không được chứa ký tự < hoặc >. Hãy thay bằng ≤ / ≥.";
+  return null;
+}
+
+// Áp một thay đổi lên bản sao danh mục, trả về {catalog,item} hoặc {error}.
+// change: {type:"add"|"edit"|"delete", key, id, name, yeuCau, minhchung}
+function applyActivityCatalogEdit(catalog,change){
+  const list=catalog[change.key];
+  if(!Array.isArray(list)) return {error:"Vui lòng chọn tiêu chí cho hoạt động."};
+  const goneError="Hoạt động này không còn trong danh mục, có thể vừa bị người khác xóa. Danh sách đã được tải lại.";
+  if(change.type==="delete"){
+    const item=list.find(x=>x.id===change.id);
+    if(!item) return {error:goneError};
+    catalog[change.key]=list.filter(x=>x.id!==change.id);
+    return {catalog,item};
+  }
+  const entry={name:String(change.name||"").trim(),yeuCau:String(change.yeuCau||"").trim(),minhchung:String(change.minhchung||"").trim()};
+  const error=validateActivityEntry(entry);
+  if(error) return {error};
+  const nameKey=window.SV5TRules.normalizeActivityName(entry.name);
+  const clash=list.find(x=>x.id!==change.id&&window.SV5TRules.normalizeActivityName(x.name)===nameKey);
+  if(clash) return {error:`Tiêu chí này đã có hoạt động “${clash.name}”.`};
+  if(change.type==="edit"){
+    const item=list.find(x=>x.id===change.id);
+    if(!item) return {error:goneError};
+    Object.assign(item,entry);
+    return {catalog,item};
+  }
+  // Mã sinh theo tên như khi nhập Excel: xóa nhầm rồi thêm lại đúng tên thì bản
+  // nháp đã chọn hoạt động này của sinh viên vẫn khớp.
+  const ids=new Set(list.map(x=>x.id));
+  let id=stableCatalogFallbackId(ACTIVITY_CATALOG_PREFIXES[change.key],entry.name);
+  if(ids.has(id)){let suffix=2;while(ids.has(`${id}-${suffix}`))suffix++;id=`${id}-${suffix}`;}
+  const item={id,...entry};
+  list.push(item);
+  return {catalog,item};
+}
+
+function activityMatchesSearch(item,search){
+  const query=normalizeCatalogText(search);
+  return !query||[item.name,item.yeuCau,item.minhchung,item.id].some(value=>normalizeCatalogText(value).includes(query));
+}
+
+const _activityManager={search:"",section:"",form:null,confirmDelete:null,busy:false,message:null,highlight:"",scrollToHighlight:false};
+let _activityFormSeq=0;
+
+function activityManagerIsOpen(){ return document.getElementById("activityManagerModal")?.style.display==="block"; }
+
+// Lấy danh mục mới nhất trước khi mở và trước mỗi lần lưu: nhiều người trong Ban
+// cùng quản lý thì người lưu sau không đè mất hoạt động người kia vừa thêm.
+async function refreshActivityCatalogFromServer(){
+  const result=await callApi("/api/config",{cache:"no-store"});
+  const catalog=result.ok?result.body?.config?.activityCatalog:null;
+  if(!catalog) return false;
+  const before=JSON.stringify(getActivityCatalogSnapshot());
+  if(!applyActivityCatalog(catalog)) return false;
+  APP_CONFIG.activityCatalog=catalog;
+  if(JSON.stringify(getActivityCatalogSnapshot())!==before) render();
+  return true;
+}
+
+async function saveActivityCatalogChange(change){
+  if(typeof isAdminUnlocked!=="function"||!isAdminUnlocked()) return {error:"Phiên quản trị đã kết thúc. Hãy đăng nhập lại rồi thao tác tiếp."};
+  _activityManager.busy=true;
+  renderActivityManager();
+  try{
+    await refreshActivityCatalogFromServer();
+    const result=applyActivityCatalogEdit(getActivityCatalogSnapshot(),change);
+    if(result.error) return result;
+    const saved=await callApi("/api/admin/activity-catalog",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({catalog:result.catalog})},{admin:true});
+    if(!saved.ok){
+      const label=API_SCOPE_LABEL[saved.scope]||API_SCOPE_LABEL.unknown;
+      const detail=(saved.body?.issues||[]).map(issue=>issue.reason).filter(Boolean)[0];
+      return {error:`${label.title}: ${saved.message}${detail?` ${detail}`:""} Danh mục trên hệ thống chưa bị thay đổi.`};
+    }
+    APP_CONFIG.activityCatalog=JSON.parse(JSON.stringify(result.catalog));
+    applyActivityCatalog(result.catalog);
+    render();
+    return result;
+  } finally {
+    _activityManager.busy=false;
+  }
+}
+
+async function openActivityManager({reset=false}={}){
+  if(reset) Object.assign(_activityManager,{search:"",section:"",form:null,confirmDelete:null,message:null,highlight:""});
+  document.getElementById("activitySearchInput").value=_activityManager.search;
+  showOnlyModal("activityManagerModal");
+  renderActivityManager();
+  if(_activityManager.busy) return;
+  if(await refreshActivityCatalogFromServer() && activityManagerIsOpen()) renderActivityManager();
+}
+
+function closeActivityManager(){
+  document.getElementById("activityManagerModal").style.display="none";
+  _activityManager.form=null;
+  _activityManager.confirmDelete=null;
+  hideOverlayIfEmpty();
+}
+
+function openActivityForm(mode,key,id){
+  const item=mode==="edit"?(CRITERIA[key]||[]).find(x=>x.id===id):null;
+  if(mode==="edit"&&!item) return;
+  _activityManager.form={token:String(++_activityFormSeq),mode,key:key||"",id:item?.id||"",name:item?.name||"",yeuCau:item?.yeuCau||"",minhchung:item?.minhchung||"",error:""};
+  _activityManager.confirmDelete=null;
+  _activityManager.message=null;
+  renderActivityManager();
+  document.getElementById("activityForm").scrollIntoView({block:"nearest",behavior:"smooth"});
+  document.getElementById(mode==="add"&&!key?"activityFormGroup":"activityFormName")?.focus({preventScroll:true});
+}
+
+async function submitActivityForm(){
+  const form=_activityManager.form;
+  if(!form||_activityManager.busy) return;
+  const change={type:form.mode,key:form.key,id:form.id,name:form.name,yeuCau:form.yeuCau,minhchung:form.minhchung};
+  const precheck=applyActivityCatalogEdit(getActivityCatalogSnapshot(),change);
+  if(precheck.error){ form.error=precheck.error; renderActivityManager(); return; }
+  form.error="";
+  const outcome=await saveActivityCatalogChange(change);
+  if(outcome.error){
+    if(_activityManager.form===form) form.error=outcome.error;
+    else _activityManager.message={type:"error",text:outcome.error};
+    renderActivityManager();
+    return;
+  }
+  const group=activityCatalogGroups().find(g=>g.key===form.key);
+  _activityManager.form=null;
+  // Hoạt động vừa lưu phải nhìn thấy được, kể cả khi đang lọc hoặc tìm kiếm.
+  if(_activityManager.section&&_activityManager.section!==group.section) _activityManager.section=group.section;
+  if(!activityMatchesSearch(outcome.item,_activityManager.search)){
+    _activityManager.search="";
+    document.getElementById("activitySearchInput").value="";
+  }
+  _activityManager.highlight=`${form.key}::${outcome.item.id}`;
+  _activityManager.scrollToHighlight=true;
+  _activityManager.message={type:"ok",text:form.mode==="edit"
+    ? `Đã lưu thay đổi cho “${outcome.item.name}”.`
+    : `Đã thêm “${outcome.item.name}” vào ${activityGroupName(group)}. Sinh viên sẽ thấy hoạt động này khi tải lại trang.`};
+  renderActivityManager();
+}
+
+async function deleteActivityFromCatalog(key,id){
+  _activityManager.confirmDelete=null;
+  const outcome=await saveActivityCatalogChange({type:"delete",key,id});
+  if(outcome.error) _activityManager.message={type:"error",text:outcome.error};
+  else {
+    if(_activityManager.form?.key===key&&_activityManager.form?.id===id) _activityManager.form=null;
+    _activityManager.message={type:"ok",text:`Đã xóa “${outcome.item.name}”. Sinh viên đã chọn hoạt động này trong bản nháp sẽ được nhắc là hoạt động không còn trong danh mục.`};
+  }
+  renderActivityManager();
+}
+
+function renderActivityForm(groups){
+  const host=document.getElementById("activityForm");
+  const form=_activityManager.form;
+  if(!form){ host.style.display="none"; host.innerHTML=""; delete host.dataset.token; return; }
+  host.style.display="";
+  // Chỉ dựng lại khi mở form mới, để danh sách vẽ lại không xóa chữ đang gõ.
+  if(host.dataset.token!==form.token){
+    host.dataset.token=form.token;
+    const shortName=g=>{
+      const text=g.label.length>90?g.label.slice(0,88).trimEnd()+"…":g.label;
+      return `${g.groupId?g.groupId+" · ":""}${g.kind==="chinh"?"Chính":"Phụ"} · ${text}`;
+    };
+    const options=ACTIVITY_SECTIONS.map(section=>`<optgroup label="${escapeHtmlAttr(section)}">${
+      groups.filter(g=>g.section===section).map(g=>`<option value="${g.key}" ${g.key===form.key?"selected":""}>${escapeHtml(shortName(g))}</option>`).join("")
+    }</optgroup>`).join("");
+    host.innerHTML=`
+      <h4>${form.mode==="edit"?"Sửa hoạt động":"Thêm hoạt động mới"}</h4>
+      <div class="field">
+        <label for="activityFormGroup">Tiêu chí</label>
+        <select id="activityFormGroup" ${form.mode==="edit"?"disabled":""}>${form.key?"":'<option value="" selected>Chọn tiêu chí</option>'}${options}</select>
+        <div class="hint" id="activityFormGroupLabel"></div>
+        ${form.mode==="edit"?'<div class="hint">Muốn chuyển sang tiêu chí khác thì xóa hoạt động này rồi thêm lại ở tiêu chí mới.</div>':""}
+      </div>
+      <div class="field">
+        <label for="activityFormName">Tên hoạt động</label>
+        <input type="text" id="activityFormName" maxlength="500" placeholder="VD: Tham gia Cuộc thi Olympic Tiếng Anh cấp Đại học năm 2026">
+      </div>
+      <div class="activity-form-grid">
+        <div class="field"><label for="activityFormRequirement">Yêu cầu</label><input type="text" id="activityFormRequirement" maxlength="500" placeholder="VD: Tham gia"></div>
+        <div class="field"><label for="activityFormEvidence">Cách thức minh chứng</label><input type="text" id="activityFormEvidence" maxlength="1000" placeholder="VD: Giấy chứng nhận của BTC"></div>
+      </div>
+      <p class="err-msg" id="activityFormError" style="display:none"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="activityFormCancel">Hủy</button>
+        <button type="button" class="btn btn-primary" id="activityFormSave">Lưu hoạt động</button>
+      </div>`;
+    const fields={activityFormName:"name",activityFormRequirement:"yeuCau",activityFormEvidence:"minhchung"};
+    Object.entries(fields).forEach(([inputId,prop])=>{
+      const input=document.getElementById(inputId);
+      input.value=form[prop];
+      input.addEventListener("input",()=>{ form[prop]=input.value; });
+      input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitActivityForm(); } });
+    });
+    document.getElementById("activityFormGroup").addEventListener("change",e=>{ form.key=e.target.value; form.error=""; renderActivityManager(); });
+    document.getElementById("activityFormCancel").onclick=()=>{ _activityManager.form=null; renderActivityManager(); };
+    document.getElementById("activityFormSave").onclick=submitActivityForm;
+  }
+  const group=groups.find(g=>g.key===form.key);
+  document.getElementById("activityFormGroupLabel").textContent=group?`${activityKindLabel(group.kind)}: ${group.label}`:"";
+  const error=document.getElementById("activityFormError");
+  error.textContent=form.error||"";
+  error.style.display=form.error?"":"none";
+  const save=document.getElementById("activityFormSave");
+  save.disabled=_activityManager.busy;
+  save.textContent=_activityManager.busy?"Đang lưu...":"Lưu hoạt động";
+}
+
+function renderActivityManager(){
+  const listHost=document.getElementById("activityManagerList");
+  if(!listHost) return;
+  const m=_activityManager;
+  const groups=activityCatalogGroups();
+  const countOf=list=>list.reduce((sum,g)=>sum+CRITERIA[g.key].length,0);
+
+  const chips=[{value:"",label:"Tất cả",count:countOf(groups)}]
+    .concat(ACTIVITY_SECTIONS.map(section=>({value:section,label:section.replace(/ Tốt$/,""),count:countOf(groups.filter(g=>g.section===section))})));
+  document.getElementById("activityManagerStats").innerHTML=chips.map(chip=>
+    `<button type="button" class="activity-stat${m.section===chip.value?" active":""}" data-section="${escapeHtmlAttr(chip.value)}">${escapeHtml(chip.label)} <strong>${chip.count}</strong></button>`
+  ).join("");
+
+  const messageHost=document.getElementById("activityManagerMessage");
+  messageHost.className=m.message?`activity-message ${m.message.type}`:"";
+  messageHost.textContent=m.message?.text||"";
+  ["addActivityBtn","importExcelBtn","exportExcelBtn"].forEach(id=>{ const button=document.getElementById(id); if(button&&!_activityCatalogImportRunning) button.disabled=m.busy; });
+
+  renderActivityForm(groups);
+
+  const disabled=m.busy?"disabled":"";
+  const rowHtml=(g,item)=>{
+    const confirming=m.confirmDelete?.key===g.key&&m.confirmDelete?.id===item.id;
+    const data=`data-key="${g.key}" data-id="${escapeHtmlAttr(item.id)}"`;
+    const actions=confirming
+      ? `<span class="activity-confirm">Xóa hoạt động này?</span>
+         <button type="button" class="btn btn-secondary btn-small" data-action="cancel-delete" ${disabled}>Không</button>
+         <button type="button" class="btn btn-danger btn-small" data-action="confirm-delete" ${data} ${disabled}>Xóa</button>`
+      : `<button type="button" class="btn btn-secondary btn-small" data-action="edit" ${data} ${disabled}>Sửa</button>
+         <button type="button" class="btn btn-danger btn-small" data-action="delete" ${data} ${disabled}>Xóa</button>`;
+    return `<div class="activity-row${m.highlight===`${g.key}::${item.id}`?" is-new":""}">
+      <div class="activity-main">
+        <div class="activity-name">${escapeHtml(item.name)}</div>
+        <div class="activity-meta">
+          ${item.yeuCau?`<div><b>Yêu cầu:</b> ${escapeHtml(item.yeuCau)}</div>`:""}
+          ${item.minhchung?`<div><b>Minh chứng:</b> ${escapeHtml(item.minhchung)}</div>`:""}
+          <div>Mã: ${escapeHtml(item.id)}</div>
+        </div>
+      </div>
+      <div class="activity-actions">${actions}</div>
+    </div>`;
+  };
+
+  const html=ACTIVITY_SECTIONS.filter(section=>!m.section||m.section===section).map(section=>{
+    const sectionGroups=groups.filter(g=>g.section===section);
+    const blocks=sectionGroups.map(g=>{
+      const items=CRITERIA[g.key].filter(item=>activityMatchesSearch(item,m.search));
+      if(m.search&&!items.length) return "";
+      const rows=items.length?items.map(item=>rowHtml(g,item)).join(""):'<div class="activity-empty">Chưa có hoạt động nào trong tiêu chí này.</div>';
+      return `<div class="activity-group">
+        <div class="activity-group-head">
+          <div class="activity-group-title">
+            <div class="activity-group-tags">
+              <span class="activity-kind ${g.kind}">${activityKindLabel(g.kind)}</span>
+              ${g.groupId?`<span class="activity-code">${g.groupId}</span>`:""}
+              <span class="activity-code">${CRITERIA[g.key].length} hoạt động</span>
+            </div>
+            <div class="activity-group-label">${escapeHtml(g.label)}</div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-small" data-action="add" data-key="${g.key}" ${disabled}>+ Thêm</button>
+        </div>
+        ${rows}
+      </div>`;
+    }).join("");
+    if(!blocks) return "";
+    return `<section class="activity-section"><h4 class="activity-section-title">${escapeHtml(section)} <span>${countOf(sectionGroups)} hoạt động</span></h4>${blocks}</section>`;
+  }).join("");
+  listHost.innerHTML=html||`<div class="empty-state">Không tìm thấy hoạt động nào khớp “${escapeHtml(m.search)}”.</div>`;
+
+  if(m.highlight&&m.scrollToHighlight){
+    m.scrollToHighlight=false;
+    listHost.querySelector(".activity-row.is-new")?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    const mark=m.highlight;
+    setTimeout(()=>{ if(_activityManager.highlight===mark){ _activityManager.highlight=""; listHost.querySelector(".activity-row.is-new")?.classList.remove("is-new"); } },2500);
+  }
+}
+
+function initActivityManager(){
+  document.getElementById("manageActivitiesBtn").onclick=()=>openActivityManager({reset:true});
+  document.getElementById("closeActivityManagerBtn").onclick=closeActivityManager;
+  document.getElementById("addActivityBtn").onclick=()=>openActivityForm("add");
+  document.getElementById("activitySearchInput").addEventListener("input",e=>{ _activityManager.search=e.target.value; renderActivityManager(); });
+  document.getElementById("activityManagerStats").addEventListener("click",e=>{
+    const button=e.target.closest("button[data-section]");
+    if(!button) return;
+    _activityManager.section=button.dataset.section;
+    renderActivityManager();
+  });
+  document.getElementById("activityManagerList").addEventListener("click",e=>{
+    const button=e.target.closest("button[data-action]");
+    if(!button||_activityManager.busy) return;
+    const {action,key,id}=button.dataset;
+    if(action==="add") openActivityForm("add",key);
+    else if(action==="edit") openActivityForm("edit",key,id);
+    else if(action==="delete"){ _activityManager.confirmDelete={key,id}; _activityManager.message=null; renderActivityManager(); }
+    else if(action==="cancel-delete"){ _activityManager.confirmDelete=null; renderActivityManager(); }
+    else if(action==="confirm-delete") deleteActivityFromCatalog(key,id);
+  });
+  // Nhập/xuất Excel báo kết quả bằng hộp thoại chung, hộp thoại đó đóng popup này,
+  // nên mở lại popup sau khi người dùng đọc xong thông báo.
+  document.getElementById("exportExcelBtn").onclick=async()=>{ await exportCriteriaExcel(); if(!activityManagerIsOpen()) openActivityManager(); };
+  document.getElementById("importExcelBtn").onclick=()=>document.getElementById("importExcelInput").click();
+  document.getElementById("importExcelInput").addEventListener("change",async e=>{
+    const file=e.target.files&&e.target.files[0];
+    e.target.value="";
+    if(!file) return;
+    markStateDirty();
+    Object.assign(_activityManager,{form:null,confirmDelete:null,message:null});
+    await importCriteriaExcel(file);
+    openActivityManager();
+  });
 }
 
 // (Sự kiện các nút + lệnh render() khởi động được gắn tập trung trong main.js)

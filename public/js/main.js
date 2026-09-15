@@ -26,17 +26,9 @@ document.addEventListener("click", event => {
 }, true);
 
 document.getElementById("fillSampleBtn").addEventListener("click", () => { fillSampleData(); markStateDirty(); });
-document.getElementById("exportExcelBtn").addEventListener("click", exportCriteriaExcel);
-document.getElementById("importExcelBtn").addEventListener("click", () => document.getElementById("importExcelInput").click());
-document.getElementById("importExcelInput").addEventListener("change", (e) => {
-  if(e.target.files && e.target.files[0]){
-    importCriteriaExcel(e.target.files[0]);
-    markStateDirty();
-  }
-  e.target.value = "";
-});
 
 initAdminUI();
+initActivityManager();
 state.personal.khoaTruong = "Điện - Điện tử";
 render();
 maybeOfferRestoreDraft();

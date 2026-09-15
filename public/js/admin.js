@@ -119,21 +119,21 @@ async function adminFetch(url,options){
 }
 
 function setAdminButtonsVisible(visible){
-  ["fillSampleBtn","importExcelBtn","exportExcelBtn","adminConfigBtn","adminSubmissionsBtn"].forEach(id => {
+  ["fillSampleBtn","manageActivitiesBtn","adminConfigBtn","adminSubmissionsBtn"].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = visible ? "" : "none";
   });
 }
 
 function closeAllModalPanels(){
-  ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog"].forEach(id => {
+  ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog","activityManagerModal"].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = "none";
   });
 }
 
 function hideOverlayIfEmpty(){
-  const anyOpen = ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog"].some(id => {
+  const anyOpen = ["passwordModal","adminConfigPanel","adminSubmissionsPanel","imagePreviewModal","deletePasswordModal","submissionReviewModal","adminCheckModal","lookupSubmissionModal","appDialog","proposedDialog","activityManagerModal"].some(id => {
     const el = document.getElementById(id);
     return el && el.style.display === "block";
   });
