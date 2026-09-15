@@ -2773,7 +2773,7 @@ function fillSampleData(){
     fullName:"Nguyễn Văn A", gender:"Nam", birthYear:"2006", ethnicity:"Kinh", mssv:"202414918",
     className:"Điện tử 01 - K69", khoaTruong:"Điện - Điện tử",
     positions:["Ủy viên Ban Chấp hành Chi đoàn, Chi hội lớp"],
-    partyStatus:"Đoàn viên", phone:"0904123456"
+    partyStatus:"Đoàn viên", phone:"0915283746"
   };
   state.reportDate = { day:String(today.getDate()), month:String(today.getMonth()+1), year:String(today.getFullYear()) };
   state.daoDuc = {
